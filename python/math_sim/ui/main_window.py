@@ -184,9 +184,9 @@ class MainWindow(tk.Tk):
             self.after(0, self._show_error, str(exc))
 
     def _show_result(self, result: dict) -> None:
-        self.pi_value.set(f"{result.get('estimate', 0.0):.10f}")
+        self.pi_value.set(f"{result.get('pi_estimate', 0.0):.10f}")
         self.error_value.set(f"{result.get('absolute_error', 0.0):.10f}")
-        self.inside_value.set(f"{result.get('inside_circle', 0):,}")
+        self.inside_value.set(f"{result.get('inside', 0):,}")
         elapsed = result.get("elapsed_ms")
         self.elapsed_value.set(f"{elapsed:.2f} ms" if isinstance(elapsed, (int, float)) else "—")
         self.status_var.set("Completed")
