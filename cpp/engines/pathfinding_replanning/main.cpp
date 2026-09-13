@@ -17,6 +17,8 @@ struct Options {
     std::uint64_t seed = 42;
     std::string algorithm = "lpa_star";
     bool diagonal = false;
+    int block_x = -1;
+    int block_y = -1;
 };
 
 Options parse_args(int argc, char* argv[]) {
@@ -33,28 +35,45 @@ Options parse_args(int argc, char* argv[]) {
         else if (arg=="--seed") o.seed=std::stoull(value());
         else if (arg=="--algorithm") o.algorithm=value();
         else if (arg=="--diagonal") o.diagonal=std::stoi(value())!=0;
+        else if (arg=="--block-x") o.block_x=std::stoi(value());
+        else if (arg=="--block-y") o.block_y=std::stoi(value());
         else throw std::invalid_argument("unknown argument: " + arg);
     }
     if (o.algorithm!="lpa_star" && o.algorithm!="dstar_lite") throw std::invalid_argument("algorithm must be lpa_star or dstar_lite");
+    if (o.width < 2 || o.height < 2) throw std::invalid_argument("grid dimensions must be at least 2");
+    if (o.obstacles < 0.0 || o.obstacles >= 1.0) throw std::invalid_argument("obstacles must be in [0,1)");
     return o;
 }
 
 template <typename Planner>
-void run(Planner& planner, const Options& options) {
+void run(Planner& planner, const math_sim::grid_advanced::GridMap& original_map, const Options& options) {
     auto first = planner.compute();
     bool changed = false;
-    int changed_x = -1, changed_y = -1;
-    if (first.path.size() > 2) {
-        const auto p = first.path[first.path.size()/2];
-        changed_x = p.x; changed_y = p.y;
-        planner.set_blocked(p.x,p.y,true);
+    int changed_x = options.block_x, changed_y = options.block_y;
+
+    if (changed_x < 0 || changed_y < 0) {
+        if (first.path.size() > 2) {
+            const auto p = first.path[first.path.size()/2];
+            changed_x = p.x;
+            changed_y = p.y;
+        }
+    }
+
+    if (changed_x >= 0 && changed_y >= 0 &&
+        changed_x < original_map.width && changed_y < original_map.height &&
+        !(changed_x == 0 && changed_y == 0) &&
+        !(changed_x == original_map.width - 1 && changed_y == original_map.height - 1)) {
+        planner.set_blocked(changed_x, changed_y, true);
         changed = true;
     }
+
     auto second = planner.compute();
 
     std::cout << std::setprecision(12)
               << "{\"simulation\":\"pathfinding_replanning\","
               << "\"algorithm\":\"" << options.algorithm << "\","
+              << "\"width\":" << original_map.width << ','
+              << "\"height\":" << original_map.height << ','
               << "\"changed\":" << (changed?"true":"false") << ','
               << "\"changed_cell\":[" << changed_x << ',' << changed_y << "],"
               << "\"first_found\":" << (first.found?"true":"false") << ','
@@ -63,7 +82,21 @@ void run(Planner& planner, const Options& options) {
               << "\"second_found\":" << (second.found?"true":"false") << ','
               << "\"second_cost\":" << second.cost << ','
               << "\"second_visited\":" << second.visited << ','
-              << "\"second_path\":[";
+              << "\"cells\":[";
+    for (std::size_t i=0;i<original_map.cells.size();++i) {
+        if (i) std::cout << ',';
+        const auto& c = original_map.cells[i];
+        const int x = static_cast<int>(i % static_cast<std::size_t>(original_map.width));
+        const int y = static_cast<int>(i / static_cast<std::size_t>(original_map.width));
+        const bool blocked = c.blocked || (changed && x == changed_x && y == changed_y);
+        std::cout << '[' << (blocked ? 1 : 0) << ',' << c.base_cost << ']';
+    }
+    std::cout << "],\"first_path\":[";
+    for (std::size_t i=0;i<first.path.size();++i) {
+        if (i) std::cout << ',';
+        std::cout << '[' << first.path[i].x << ',' << first.path[i].y << ']';
+    }
+    std::cout << "],\"second_path\":[";
     for (std::size_t i=0;i<second.path.size();++i) {
         if (i) std::cout << ',';
         std::cout << '[' << second.path[i].x << ',' << second.path[i].y << ']';
@@ -85,10 +118,10 @@ int main(int argc, char* argv[]) {
         const math_sim::pathfinding_advanced::Point goal{o.width-1,o.height-1};
         if (o.algorithm=="lpa_star") {
             math_sim::incremental_pathfinding::LPAStar planner(map,start,goal,o.diagonal);
-            run(planner,o);
+            run(planner,map,o);
         } else {
             math_sim::incremental_pathfinding::DStarLite planner(map,start,goal,o.diagonal);
-            run(planner,o);
+            run(planner,map,o);
         }
         return 0;
     } catch (const std::exception& e) {
