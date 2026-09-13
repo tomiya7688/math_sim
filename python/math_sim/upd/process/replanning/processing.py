@@ -13,6 +13,7 @@ class ReplanningProcessing:
             seed=request.seed,
             algorithm=request.algorithm,
             diagonal=request.diagonal,
-            block_cell=request.block_cell,
+            change_cell=request.change_cell,
+            change_mode=request.change_mode,
         )
         return ReplanningResponse(payload=result)
