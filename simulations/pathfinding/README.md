@@ -28,96 +28,62 @@ The Tkinter `Path Finding` page currently exposes 13 algorithms:
 
 `cpp/include/math_sim/grid_map_advanced.hpp` adds a second map model for richer experiments without breaking the standard grid API.
 
-Each advanced cell can represent:
+Each advanced cell can represent blocked state, traversal cost, one-way exits, and time-varying cost parameters. The generator supports continuous, bounded-integer, and 0/1 cost profiles together with optional 8-way movement.
 
-- blocked / traversable state
-- base traversal cost
-- one-way exit direction mask
-- time-varying traversal-cost amplitude, period, and phase
+`cpp/include/math_sim/pathfinding_advanced.hpp` provides Dijkstra, A*, 0-1 BFS, and Dial's algorithm on this model.
 
-The generator supports these cost profiles:
-
-- `continuous`: real-valued positive terrain costs
-- `integer`: bounded integer terrain costs
-- `zero_one`: terrain costs restricted to 0 or 1
-
-Advanced maps can also randomly generate one-way cells and time-varying cells.
-
-## Advanced movement and algorithms
-
-`cpp/include/math_sim/pathfinding_advanced.hpp` supports:
-
-- 4-way movement
-- 8-way movement with diagonal corner-cut prevention
-- one-way movement restrictions
-- optional time-varying traversal costs
-- Dijkstra on the advanced grid
-- A* with Manhattan or octile-style heuristic depending on movement mode
-- 0-1 BFS for 0/1 maps
-- Dial's algorithm for bounded non-negative integer-cost maps
-
-`cpp/include/math_sim/jump_point_search.hpp` adds Jump Point Search (JPS). The current JPS implementation intentionally requires:
-
-- 8-way movement
-- static terrain
-- uniform positive terrain cost
-- no one-way restrictions
-
-These constraints keep JPS aligned with the grid assumptions under which its pruning rules are valid.
-
-Python callers can use:
-
-```python
-from math_sim.engines.pathfinding_advanced import solve_advanced_map
-
-result = solve_advanced_map(
-    algorithm="jps",
-    diagonal=True,
-    cost_profile="integer",
-    min_cost=1,
-    max_cost=1,
-)
-```
+`cpp/include/math_sim/jump_point_search.hpp` adds JPS. Its current implementation intentionally requires 8-way movement, static terrain, uniform positive cost, and no one-way restrictions so its pruning rules remain valid.
 
 ## Incremental replanning
 
-`cpp/include/math_sim/incremental_pathfinding.hpp` provides stateful replanning implementations:
+`cpp/include/math_sim/incremental_pathfinding.hpp` provides stateful implementations of Lifelong Planning A* (`LPAStar`) and D* Lite (`DStarLite`). They retain `g`, `rhs`, and priority-queue state across map changes instead of rebuilding all search state from scratch.
 
-- `LPAStar`: Lifelong Planning A*
-- `DStarLite`: reverse incremental search suitable for replanning after map changes
-
-Unlike ordinary A*, these planners retain `g`, `rhs`, and priority-queue state between searches. When an obstacle or traversal cost changes, affected vertices are updated instead of rebuilding all search state from scratch.
-
-The dedicated executable is `pathfinding_replanning`. It performs:
-
-1. an initial search,
-2. a map-change event by blocking a cell on the discovered route,
-3. an incremental replan,
-4. reporting `first_visited` and `second_visited` so reuse can be measured.
+The `pathfinding_replanning` executable can perform an initial search, apply an explicit block/unblock event to a selected cell, and incrementally replan. Its JSON payload contains the generated cells, the original path, the replanned path, and visited-node counts before and after the change.
 
 Python callers can use:
 
 ```python
 from math_sim.engines.pathfinding_replanning import simulate_replanning
 
-result = simulate_replanning(algorithm="lpa_star")
-result = simulate_replanning(algorithm="dstar_lite")
+result = simulate_replanning(
+    algorithm="dstar_lite",
+    change_cell=(12, 8),
+    change_mode="block",
+)
 ```
 
-The first replanning implementation uses static non-negative terrain costs and no one-way/dynamic-cost changes. Those restrictions are deliberate: incremental graph updates are exposed explicitly instead of pretending a time-dependent graph is a static shortest-path problem.
+Supported change modes are `none`, `block`, `unblock`, and `auto`.
+
+## Interactive visualization
+
+The parent Tkinter app now exposes two tabs inside **Path Finding**:
+
+- **Standard** — the existing multi-algorithm comparison lab.
+- **Dynamic Replanning** — an interactive LPA* / D* Lite visualization.
+
+In Dynamic Replanning:
+
+1. choose map size, obstacle probability, seed, algorithm, and 4/8-way movement,
+2. generate the deterministic map,
+3. click a traversable cell to block it or an obstacle cell to unblock it,
+4. the native incremental planner replans immediately,
+5. the original route is shown in a muted tone and the new route is highlighted,
+6. `first_visited` and `second_visited` are displayed so the reuse benefit is visible.
+
+Start and goal cells cannot be edited.
 
 ## Architecture
 
-The standard pathfinding page already uses the UPD Commander path:
+Dynamic replanning also follows the UPD Commander path:
 
 ```text
-UI Processing
+Tkinter UI Processing
   -> UI Commander
   -> UI Messenger
   -> Process Messenger
   -> Process Commander
   -> Process Processing
-  -> native C++ engine
+  -> native C++ replanning engine
 ```
 
-Advanced and incremental engines remain behind the Python/native boundary, so their UI can be migrated behind the same UPD Process layer without coupling Tkinter directly to C++.
+This keeps rendering decisions in the UI layer and graph calculation in the Process/native layer.
