@@ -48,6 +48,25 @@ def resolve_engine_path() -> Path:
     raise FileNotFoundError("Maze engine was not found. Build the C++ engines first.")
 
 
+def _attach_metrics(result: dict[str, Any]) -> dict[str, Any]:
+    path = result.get("path") or []
+    optimal_path = result.get("optimal_path") or []
+    found = bool(result.get("found", False))
+    steps = max(len(path) - 1, 0) if found else 0
+    optimal_steps = max(len(optimal_path) - 1, 0)
+    extra_steps = max(steps - optimal_steps, 0) if found else 0
+    loss_percent = (100.0 * extra_steps / optimal_steps) if found and optimal_steps > 0 else 0.0
+    path_efficiency = (100.0 * optimal_steps / steps) if found and steps > 0 and optimal_steps > 0 else 0.0
+
+    result["steps"] = steps
+    result["optimal_steps"] = optimal_steps
+    result["extra_steps"] = extra_steps
+    result["loss_percent"] = loss_percent
+    result["path_efficiency"] = path_efficiency
+    result["calculation_count"] = int(result.get("visited", 0))
+    return result
+
+
 def generate_and_solve_maze(
     *,
     width: int = 24,
@@ -76,4 +95,4 @@ def generate_and_solve_maze(
         text=True,
         encoding="utf-8",
     )
-    return json.loads(completed.stdout)
+    return _attach_metrics(json.loads(completed.stdout))
