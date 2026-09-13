@@ -39,7 +39,7 @@ Options parse_args(int argc, char* argv[]) {
         else if (arg == "--help") {
             std::cout << "Usage: pathfinding [--width N] [--height N] [--obstacles P] "
                          "[--min-cost X] [--max-cost X] [--seed N] "
-                         "[--algorithm dijkstra|astar|bfs|greedy]\n";
+                         "[--algorithm dijkstra|bidijkstra|astar|weighted_astar|bfs|bibfs|dfs|greedy]\n";
             std::exit(0);
         } else throw std::invalid_argument("unknown argument: " + arg);
     }
