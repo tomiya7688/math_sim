@@ -8,6 +8,8 @@ from math_sim.user_functions.providers import FunctionProvider, create_provider
 
 
 class FunctionCatalog:
+    """Common catalog for editor expressions, Python files, and native executables."""
+
     def __init__(self, specs: Iterable[FunctionSpec] = ()) -> None:
         self._specs: dict[str, FunctionSpec] = {}
         self._providers: dict[str, FunctionProvider] = {}
@@ -32,3 +34,6 @@ class FunctionCatalog:
 
     def call(self, name: str, values: list[float], context: dict[str, Any] | None = None):
         return self._providers[name].evaluate(values, context)
+
+    def call_many(self, name: str, rows: list[list[float]], context: dict[str, Any] | None = None) -> list[float]:
+        return self._providers[name].evaluate_many(rows, context)
