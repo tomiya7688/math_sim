@@ -1,4 +1,5 @@
 #include "math_sim/grid_map_advanced.hpp"
+#include "math_sim/jump_point_search.hpp"
 #include "math_sim/pathfinding_advanced.hpp"
 
 #include <cstdint>
@@ -55,7 +56,7 @@ Options parse_args(int argc, char* argv[]) {
             std::cout << "Usage: pathfinding_advanced [--width N] [--height N] [--obstacles P] "
                          "[--cost-profile continuous|integer|zero_one] [--min-cost X] [--max-cost X] "
                          "[--one-way P] [--dynamic P] [--dynamic-amplitude X] [--dynamic-period X] "
-                         "[--seed N] [--algorithm dijkstra|astar|zero_one_bfs|dial] "
+                         "[--seed N] [--algorithm dijkstra|astar|zero_one_bfs|dial|jps] "
                          "[--diagonal 0|1] [--dynamic-costs 0|1] [--start-time T]\n";
             std::exit(0);
         } else throw std::invalid_argument("unknown argument: " + arg);
@@ -124,9 +125,15 @@ int main(int argc, char* argv[]) {
         const math_sim::pathfinding_advanced::Point start{0,0};
         const math_sim::pathfinding_advanced::Point goal{options.width - 1, options.height - 1};
         const int max_edge_cost = static_cast<int>(options.max_cost);
-        const auto result = math_sim::pathfinding_advanced::solve(
-            map, start, goal, options.algorithm, search, max_edge_cost
-        );
+        math_sim::pathfinding_advanced::SearchResult result;
+        if (options.algorithm == "jps") {
+            if (!options.diagonal) throw std::invalid_argument("JPS requires --diagonal 1");
+            result = math_sim::jps::search(map, start, goal);
+        } else {
+            result = math_sim::pathfinding_advanced::solve(
+                map, start, goal, options.algorithm, search, max_edge_cost
+            );
+        }
         print_json(map, result, options);
         return 0;
     } catch (const std::exception& e) {
