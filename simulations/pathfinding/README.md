@@ -56,24 +56,55 @@ Advanced maps can also randomly generate one-way cells and time-varying cells.
 - 0-1 BFS for 0/1 maps
 - Dial's algorithm for bounded non-negative integer-cost maps
 
-0-1 BFS and Dial currently use 4-way movement because their optimized bucket/deque assumptions are kept explicit in the first implementation.
+`cpp/include/math_sim/jump_point_search.hpp` adds Jump Point Search (JPS). The current JPS implementation intentionally requires:
 
-The dedicated executable is `pathfinding_advanced`, and Python callers can use:
+- 8-way movement
+- static terrain
+- uniform positive terrain cost
+- no one-way restrictions
+
+These constraints keep JPS aligned with the grid assumptions under which its pruning rules are valid.
+
+Python callers can use:
 
 ```python
 from math_sim.engines.pathfinding_advanced import solve_advanced_map
+
+result = solve_advanced_map(
+    algorithm="jps",
+    diagonal=True,
+    cost_profile="integer",
+    min_cost=1,
+    max_cost=1,
+)
 ```
 
-Important parameters include:
+## Incremental replanning
 
-- `cost_profile="continuous" | "integer" | "zero_one"`
-- `diagonal=True | False`
-- `one_way_probability`
-- `dynamic_probability`
-- `dynamic_amplitude`
-- `dynamic_period`
-- `dynamic_costs=True | False`
-- `start_time`
+`cpp/include/math_sim/incremental_pathfinding.hpp` provides stateful replanning implementations:
+
+- `LPAStar`: Lifelong Planning A*
+- `DStarLite`: reverse incremental search suitable for replanning after map changes
+
+Unlike ordinary A*, these planners retain `g`, `rhs`, and priority-queue state between searches. When an obstacle or traversal cost changes, affected vertices are updated instead of rebuilding all search state from scratch.
+
+The dedicated executable is `pathfinding_replanning`. It performs:
+
+1. an initial search,
+2. a map-change event by blocking a cell on the discovered route,
+3. an incremental replan,
+4. reporting `first_visited` and `second_visited` so reuse can be measured.
+
+Python callers can use:
+
+```python
+from math_sim.engines.pathfinding_replanning import simulate_replanning
+
+result = simulate_replanning(algorithm="lpa_star")
+result = simulate_replanning(algorithm="dstar_lite")
+```
+
+The first replanning implementation uses static non-negative terrain costs and no one-way/dynamic-cost changes. Those restrictions are deliberate: incremental graph updates are exposed explicitly instead of pretending a time-dependent graph is a static shortest-path problem.
 
 ## Architecture
 
@@ -89,10 +120,4 @@ UI Processing
   -> native C++ engine
 ```
 
-The advanced engine is kept behind the same Python/native boundary so it can be moved behind the UPD Process layer without coupling the UI to C++.
-
-## Next incremental-search phase
-
-Jump Point Search, LPA*, and D* Lite are intentionally not implemented as aliases or fallbacks. They require additional algorithm-specific state and, for LPA*/D* Lite, explicit map-change events so their incremental behavior can be measured correctly.
-
-The advanced grid now contains the movement and dynamic-cost primitives needed for that next phase.
+Advanced and incremental engines remain behind the Python/native boundary, so their UI can be migrated behind the same UPD Process layer without coupling Tkinter directly to C++.
