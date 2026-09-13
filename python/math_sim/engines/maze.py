@@ -6,7 +6,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
-GENERATORS = ("backtracker", "prim", "kruskal", "binary_tree", "sidewinder", "growing_tree")
+GENERATORS = (
+    "backtracker",
+    "prim",
+    "kruskal",
+    "binary_tree",
+    "sidewinder",
+    "growing_tree",
+    "aldous_broder",
+    "wilson",
+)
 SOLVERS = ("bfs", "dfs", "astar", "greedy", "left_hand", "right_hand")
 
 
