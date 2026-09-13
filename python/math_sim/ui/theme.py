@@ -1,0 +1,12 @@
+BG = "#0b0d10"
+PANEL = "#13171c"
+PANEL_ALT = "#1a2027"
+BORDER = "#27303a"
+TEXT = "#f5f7fa"
+MUTED = "#9aa4b2"
+ACCENT = "#4f8cff"
+ACCENT_HOVER = "#6aa0ff"
+SUCCESS = "#33c481"
+ERROR = "#ff5d73"
+
+FONT_FAMILY = "Segoe UI"
