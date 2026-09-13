@@ -7,6 +7,7 @@ from math_sim.engines.random_tree import generate_tree as generate_native_tree
 from math_sim.simulations.monte_carlo import integrate_expression
 from math_sim.ui import theme
 from math_sim.ui.perceptron_page import build_perceptron_page
+from math_sim.ui.mlp_page import build_mlp_page
 
 
 class MainWindow(tk.Tk):
@@ -37,6 +38,7 @@ class MainWindow(tk.Tk):
         self._nav_button("monte_carlo", "Monte Carlo")
         self._nav_button("random_tree", "Random Tree")
         self._nav_button("perceptron", "Perceptron")
+        self._nav_button("mlp", "Multilayer Perceptron")
 
         self.main = tk.Frame(shell, bg=theme.BG)
         self.main.pack(side="left", fill="both", expand=True)
@@ -55,6 +57,7 @@ class MainWindow(tk.Tk):
             "monte_carlo": self._build_monte_carlo_page(),
             "random_tree": self._build_random_tree_page(),
             "perceptron": build_perceptron_page(self, self.page_host),
+            "mlp": build_mlp_page(self, self.page_host),
         }
 
     def _nav_button(self, key: str, label: str) -> None:
