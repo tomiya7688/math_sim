@@ -14,8 +14,13 @@ def main() -> int:
         function = namespace.get(config.get("entrypoint", "evaluate"))
         if not callable(function):
             raise RuntimeError("configured entrypoint is not callable")
-        result = function(request.get("values", []), request.get("context", {}))
-        print(json.dumps({"value": result}, ensure_ascii=False))
+        context = request.get("context", {})
+        if "rows" in request:
+            values = [function(row, context) for row in request["rows"]]
+            print(json.dumps({"values": values}, ensure_ascii=False))
+        else:
+            result = function(request.get("values", []), context)
+            print(json.dumps({"value": result}, ensure_ascii=False))
         return 0
     except Exception as exc:
         print(str(exc), file=sys.stderr)
