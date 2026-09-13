@@ -30,6 +30,7 @@ SOLVER_LABELS = {
     "Random Mouse": "random_mouse",
 }
 NORTH, EAST, SOUTH, WEST = 1, 2, 4, 8
+PLAYBACK_SPEEDS = (0.25, 0.5, 1.0, 2.0, 4.0)
 
 
 def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
@@ -41,7 +42,7 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
     inner = tk.Frame(controls, bg=theme.PANEL); inner.pack(fill="both", expand=True, padx=20, pady=20)
     tk.Label(inner, text="Maze Lab", bg=theme.PANEL, fg=theme.TEXT,
              font=(theme.FONT_FAMILY, 15, "bold")).pack(anchor="w")
-    tk.Label(inner, text="Generate, solve, compare, and play the same maze.", bg=theme.PANEL,
+    tk.Label(inner, text="Generate, solve, compare, replay, and play the same maze.", bg=theme.PANEL,
              fg=theme.MUTED, wraplength=255, justify="left", font=(theme.FONT_FAMILY, 9)).pack(anchor="w", pady=(5, 16))
 
     width_var, height_var, seed_var = tk.StringVar(value="24"), tk.StringVar(value="18"), tk.StringVar(value="42")
@@ -86,7 +87,27 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
     tk.Label(header, textvariable=summary_var, bg=theme.PANEL, fg=theme.MUTED, font=(theme.FONT_FAMILY, 9)).pack(side="right")
 
     canvas = tk.Canvas(view, bg="#080a0d", highlightthickness=0, takefocus=True)
-    canvas.pack(fill="both", expand=True, padx=14, pady=(0, 10))
+    canvas.pack(fill="both", expand=True, padx=14, pady=(0, 8))
+
+    playback = tk.Frame(view, bg=theme.PANEL_ALT, highlightthickness=1, highlightbackground=theme.BORDER)
+    playback.pack(fill="x", padx=14, pady=(0, 8))
+    playback_status_var = tk.StringVar(value="Frame 0 / 0 · 1x")
+    tk.Label(playback, textvariable=playback_status_var, bg=theme.PANEL_ALT, fg=theme.MUTED,
+             font=(theme.FONT_FAMILY, 9)).pack(side="left", padx=(10, 8))
+
+    def small_button(text: str) -> tk.Button:
+        b = tk.Button(playback, text=text, relief="flat", bd=0, bg=theme.PANEL, fg=theme.TEXT,
+                      activebackground=theme.BORDER, activeforeground=theme.TEXT,
+                      font=(theme.FONT_FAMILY, 9, "bold"), cursor="hand2", padx=8, pady=5)
+        b.pack(side="left", padx=2, pady=5); return b
+
+    reset_replay_btn = small_button("⏮")
+    play_replay_btn = small_button("▶")
+    pause_replay_btn = small_button("⏸")
+    step_replay_btn = small_button("⏭ 1")
+    slower_btn = small_button("− speed")
+    faster_btn = small_button("+ speed")
+
     metrics = tk.Frame(view, bg=theme.PANEL); metrics.pack(fill="x", padx=14, pady=(0, 14))
     play_metrics_var = tk.StringVar(value="Moves — | Time — | Optimal — | Loss — | Efficiency —")
     compare_var = tk.StringVar(value="")
@@ -97,9 +118,12 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
              padx=12, pady=8, font=("Consolas", 9), highlightthickness=1,
              highlightbackground=theme.BORDER).pack(fill="x")
 
-    state: dict[str, object] = {"result": None, "player": (0, 0), "playing": False, "moves": 0,
-                                "backtracks": 0, "visited_cells": {(0, 0)}, "start_time": None,
-                                "elapsed": 0.0, "hint": None}
+    state: dict[str, object] = {
+        "result": None, "player": (0, 0), "playing": False, "moves": 0,
+        "backtracks": 0, "visited_cells": {(0, 0)}, "start_time": None,
+        "elapsed": 0.0, "hint": None,
+        "replay_frame": 0, "replaying": False, "replay_speed": 1.0, "replay_job": None,
+    }
 
     def params() -> dict:
         width, height, seed = int(width_var.get()), int(height_var.get()), int(seed_var.get())
@@ -111,12 +135,37 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
     def center(x: int, y: int, cw: float, ch: float) -> tuple[float, float]:
         return (x + 0.5) * cw, (y + 0.5) * ch
 
+    def replay_trace() -> list:
+        result = state.get("result")
+        if not isinstance(result, dict): return []
+        trace = result.get("trace", [])
+        return trace if isinstance(trace, list) else []
+
+    def update_replay_status() -> None:
+        total = len(replay_trace())
+        frame = min(int(state.get("replay_frame", 0)), total)
+        speed = float(state.get("replay_speed", 1.0))
+        playback_status_var.set(f"Frame {frame} / {total} · {speed:g}x")
+
     def draw() -> None:
         result = state.get("result")
         if not isinstance(result, dict): return
         walls, width, height = result.get("walls"), int(result.get("width", 0)), int(result.get("height", 0))
         if not isinstance(walls, list) or width <= 0 or height <= 0: return
         canvas.delete("all"); cw = max(canvas.winfo_width(), 200) / width; ch = max(canvas.winfo_height(), 200) / height
+
+        trace = replay_trace()
+        frame = min(int(state.get("replay_frame", 0)), len(trace))
+        for point in trace[:frame]:
+            if not isinstance(point, (list, tuple)) or len(point) != 2: continue
+            x, y = int(point[0]), int(point[1])
+            canvas.create_rectangle(x*cw+1, y*ch+1, (x+1)*cw-1, (y+1)*ch-1,
+                                    fill=theme.PANEL_ALT, outline="")
+        if frame > 0 and trace:
+            x, y = map(int, trace[frame-1])
+            canvas.create_rectangle(x*cw+2, y*ch+2, (x+1)*cw-2, (y+1)*ch-2,
+                                    fill="#3a4b63", outline="")
+
         path = result.get("path", []) if solution_var.get() else []
         if isinstance(path, list) and len(path) > 1:
             coords = [v for x, y in path for v in center(int(x), int(y), cw, ch)]
@@ -136,6 +185,54 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
         canvas.create_oval(gx-r,gy-r,gx+r,gy+r,fill=theme.ERROR,outline="")
         px,py=state.get("player",(0,0)); pcx,pcy=center(int(px),int(py),cw,ch); pr=max(3,min(cw,ch)*0.18)
         canvas.create_oval(pcx-pr,pcy-pr,pcx+pr,pcy+pr,fill="#ffffff",outline="#111111")
+        update_replay_status()
+
+    def cancel_replay_job() -> None:
+        job = state.get("replay_job")
+        if job is not None:
+            try: app.after_cancel(job)
+            except Exception: pass
+        state["replay_job"] = None
+
+    def pause_replay() -> None:
+        state["replaying"] = False
+        cancel_replay_job()
+        update_replay_status()
+
+    def replay_tick() -> None:
+        state["replay_job"] = None
+        if not state.get("replaying"): return
+        trace = replay_trace(); frame = int(state.get("replay_frame", 0))
+        if frame >= len(trace):
+            state["replaying"] = False; draw(); return
+        state["replay_frame"] = frame + 1
+        draw()
+        speed = max(float(state.get("replay_speed", 1.0)), 0.01)
+        state["replay_job"] = app.after(max(10, int(120 / speed)), replay_tick)
+
+    def start_replay() -> None:
+        trace = replay_trace()
+        if not trace:
+            status_var.set("This solver returned no replay trace."); return
+        if int(state.get("replay_frame", 0)) >= len(trace): state["replay_frame"] = 0
+        if state.get("replaying"): return
+        state["replaying"] = True; replay_tick()
+
+    def reset_replay() -> None:
+        pause_replay(); state["replay_frame"] = 0; draw()
+
+    def step_replay() -> None:
+        pause_replay(); trace = replay_trace()
+        state["replay_frame"] = min(int(state.get("replay_frame", 0)) + 1, len(trace)); draw()
+
+    def change_speed(direction: int) -> None:
+        speed = float(state.get("replay_speed", 1.0))
+        index = min(range(len(PLAYBACK_SPEEDS)), key=lambda i: abs(PLAYBACK_SPEEDS[i] - speed))
+        index = max(0, min(len(PLAYBACK_SPEEDS)-1, index + direction))
+        state["replay_speed"] = PLAYBACK_SPEEDS[index]
+        if state.get("replaying"):
+            cancel_replay_job(); state["replay_job"] = app.after(max(10, int(120 / PLAYBACK_SPEEDS[index])), replay_tick)
+        update_replay_status()
 
     def update_play_metrics() -> None:
         result = state.get("result")
@@ -151,10 +248,11 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
         if state.get("playing"): app.after(100, update_play_metrics)
 
     def finish(result: dict) -> None:
+        pause_replay()
         state.update({"result": result, "player": (0,0), "playing": False, "moves": 0, "backtracks": 0,
-                      "visited_cells": {(0,0)}, "elapsed": 0.0, "hint": None})
+                      "visited_cells": {(0,0)}, "elapsed": 0.0, "hint": None, "replay_frame": 0})
         summary_var.set(f"{result.get('generator','')} · {result.get('solver','')} · steps {int(result.get('steps',0))} · loss +{int(result.get('extra_steps',0))} ({float(result.get('loss_percent',0.0)):.1f}%) · calculations {int(result.get('calculation_count',0))}")
-        status_var.set("Maze generated. Press PLAY or show the solver path.")
+        status_var.set("Maze generated. Replay the AI trace or press PLAY.")
         for b in (generate_btn, compare_btn, play_btn): b.configure(state="normal")
         update_play_metrics(); draw(); canvas.focus_set()
 
@@ -169,7 +267,7 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
     def generate() -> None:
         try: p=params()
         except Exception as exc: status_var.set(str(exc)); return
-        state["playing"] = False
+        pause_replay(); state["playing"] = False
         for b in (generate_btn, compare_btn, play_btn): b.configure(state="disabled")
         status_var.set("Generating maze with native C++ engine…")
         threading.Thread(target=worker,args=(p,),daemon=True).start()
@@ -200,7 +298,7 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
 
     def start_play() -> None:
         if not isinstance(state.get("result"),dict): status_var.set("Generate a maze first."); return
-        state.update({"player":(0,0),"moves":0,"backtracks":0,"visited_cells":{(0,0)},"elapsed":0.0,
+        pause_replay(); state.update({"player":(0,0),"moves":0,"backtracks":0,"visited_cells":{(0,0)},"elapsed":0.0,
                       "start_time":time.perf_counter(),"playing":True,"hint":None})
         status_var.set("Playing: use Arrow keys or WASD. Reach the red goal."); canvas.focus_set(); update_play_metrics(); draw()
 
@@ -240,5 +338,8 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
         state["hint"]=tuple(optimal_path[i+1]); draw(); app.after(1300,lambda:(state.__setitem__("hint",None),draw()))
 
     generate_btn.configure(command=generate); compare_btn.configure(command=compare); play_btn.configure(command=start_play); hint_btn.configure(command=hint)
+    reset_replay_btn.configure(command=reset_replay); play_replay_btn.configure(command=start_replay)
+    pause_replay_btn.configure(command=pause_replay); step_replay_btn.configure(command=step_replay)
+    slower_btn.configure(command=lambda: change_speed(-1)); faster_btn.configure(command=lambda: change_speed(1))
     solution_var.trace_add("write",lambda *_:draw()); canvas.bind("<KeyPress>",key); canvas.bind("<Button-1>",lambda _e:canvas.focus_set()); canvas.bind("<Configure>",lambda _e:draw())
     return page
