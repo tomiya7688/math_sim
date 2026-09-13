@@ -9,6 +9,7 @@ from .monte_carlo import (
     monte_carlo_integrate,
 )
 from .random_tree import Branch, BranchRule, Segment, binary_random_rule, generate_tree
+from .perceptron import PerceptronResult, logic_gate_dataset, predict, step, train_perceptron
 
 __all__ = [
     "MonteCarloIntegralResult",
@@ -22,4 +23,9 @@ __all__ = [
     "Segment",
     "binary_random_rule",
     "generate_tree",
+    "PerceptronResult",
+    "logic_gate_dataset",
+    "predict",
+    "step",
+    "train_perceptron",
 ]
