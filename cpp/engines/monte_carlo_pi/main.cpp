@@ -4,7 +4,51 @@
 #include <iomanip>
 #include <iostream>
 #include <random>
+#include <stdexcept>
 #include <string>
+
+namespace monte_carlo {
+
+template <class Predicate>
+std::uint64_t count_hits(
+    std::uint64_t samples,
+    std::mt19937_64& rng,
+    Predicate&& predicate
+) {
+    std::uniform_real_distribution<double> uniform(0.0, 1.0);
+    std::uint64_t hits = 0;
+    for (std::uint64_t i = 0; i < samples; ++i) {
+        if (predicate(uniform(rng), uniform(rng))) {
+            ++hits;
+        }
+    }
+    return hits;
+}
+
+template <class Function>
+double integrate_1d(
+    std::uint64_t samples,
+    std::mt19937_64& rng,
+    double lower,
+    double upper,
+    Function&& function
+) {
+    if (samples == 0) {
+        throw std::invalid_argument("samples must be greater than 0");
+    }
+    if (!(lower < upper)) {
+        throw std::invalid_argument("lower must be less than upper");
+    }
+
+    std::uniform_real_distribution<double> uniform(lower, upper);
+    long double sum = 0.0L;
+    for (std::uint64_t i = 0; i < samples; ++i) {
+        sum += static_cast<long double>(function(uniform(rng)));
+    }
+    return (upper - lower) * static_cast<double>(sum / samples);
+}
+
+}  // namespace monte_carlo
 
 namespace {
 
@@ -15,7 +59,6 @@ struct Options {
 
 Options parse_args(int argc, char* argv[]) {
     Options options;
-
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--samples" && i + 1 < argc) {
@@ -29,11 +72,9 @@ Options parse_args(int argc, char* argv[]) {
             throw std::invalid_argument("Unknown or incomplete argument: " + arg);
         }
     }
-
     if (options.samples == 0) {
         throw std::invalid_argument("--samples must be greater than 0");
     }
-
     return options;
 }
 
@@ -42,18 +83,13 @@ Options parse_args(int argc, char* argv[]) {
 int main(int argc, char* argv[]) {
     try {
         const Options options = parse_args(argc, argv);
-
         std::mt19937_64 rng(options.seed);
-        std::uniform_real_distribution<double> uniform(0.0, 1.0);
 
-        std::uint64_t inside = 0;
-        for (std::uint64_t i = 0; i < options.samples; ++i) {
-            const double x = uniform(rng);
-            const double y = uniform(rng);
-            if (x * x + y * y <= 1.0) {
-                ++inside;
-            }
-        }
+        const std::uint64_t inside = monte_carlo::count_hits(
+            options.samples,
+            rng,
+            [](double x, double y) { return x * x + y * y <= 1.0; }
+        );
 
         const double pi_estimate = 4.0 * static_cast<double>(inside) /
                                    static_cast<double>(options.samples);
