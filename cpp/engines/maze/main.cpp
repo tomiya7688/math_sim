@@ -24,7 +24,7 @@ Options parse_args(int argc,char* argv[]){
         else if(arg=="--seed") o.seed=std::stoull(value());
         else if(arg=="--generator") o.generator=value();
         else if(arg=="--solver") o.solver=value();
-        else if(arg=="--help"){std::cout<<"Usage: maze [--width N] [--height N] [--seed N] [--generator backtracker|prim|kruskal|binary_tree|sidewinder|growing_tree] [--solver bfs|dfs|astar|greedy|left_hand|right_hand]\n"; std::exit(0);} else throw std::invalid_argument("unknown argument: "+arg);
+        else if(arg=="--help"){std::cout<<"Usage: maze [--width N] [--height N] [--seed N] [--generator backtracker|prim|kruskal|binary_tree|sidewinder|growing_tree|aldous_broder|wilson] [--solver bfs|bidirectional_bfs|dfs|astar|greedy|left_hand|right_hand|dead_end|random_mouse]\n"; std::exit(0);} else throw std::invalid_argument("unknown argument: "+arg);
     }
     if(o.width<2||o.height<2||o.width>120||o.height>90) throw std::invalid_argument("maze dimensions out of range");
     return o;
@@ -36,7 +36,7 @@ int main(int argc,char* argv[]){
         auto o=parse_args(argc,argv);
         auto m=math_sim::maze_generators::generate(o.width,o.height,o.seed,o.generator);
         math_sim::maze::Point start{0,0}, goal{o.width-1,o.height-1};
-        auto result=math_sim::maze_solvers::solve(m,start,goal,o.solver);
+        auto result=math_sim::maze_solvers::solve(m,start,goal,o.solver,o.seed);
         auto optimal=math_sim::maze_solvers::bfs(m,start,goal);
         std::cout<<std::setprecision(12)<<"{\"simulation\":\"maze\",\"width\":"<<m.width<<",\"height\":"<<m.height
                  <<",\"seed\":"<<o.seed<<",\"generator\":\""<<o.generator<<"\",\"solver\":\""<<o.solver<<"\",\"found\":"<<(result.found?"true":"false")
