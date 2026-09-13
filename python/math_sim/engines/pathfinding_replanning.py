@@ -8,6 +8,7 @@ from typing import Any
 
 
 ALGORITHMS = ("lpa_star", "dstar_lite")
+CHANGE_MODES = ("auto", "block", "unblock", "none")
 
 
 def _engine_name() -> str:
@@ -41,11 +42,15 @@ def simulate_replanning(
     seed: int = 42,
     algorithm: str = "lpa_star",
     diagonal: bool = False,
-    block_cell: tuple[int, int] | None = None,
+    change_cell: tuple[int, int] | None = None,
+    change_mode: str = "auto",
 ) -> dict[str, Any]:
     algorithm = algorithm.lower()
+    change_mode = change_mode.lower()
     if algorithm not in ALGORITHMS:
         raise ValueError(f"algorithm must be one of: {', '.join(ALGORITHMS)}")
+    if change_mode not in CHANGE_MODES:
+        raise ValueError(f"change_mode must be one of: {', '.join(CHANGE_MODES)}")
 
     command = [
         str(resolve_engine_path()),
@@ -55,10 +60,11 @@ def simulate_replanning(
         "--seed", str(seed),
         "--algorithm", algorithm,
         "--diagonal", "1" if diagonal else "0",
+        "--change-mode", change_mode,
     ]
-    if block_cell is not None:
-        x, y = block_cell
-        command.extend(["--block-x", str(x), "--block-y", str(y)])
+    if change_cell is not None:
+        x, y = change_cell
+        command.extend(["--change-x", str(x), "--change-y", str(y)])
 
     completed = subprocess.run(
         command,
