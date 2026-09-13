@@ -5,7 +5,6 @@ import time
 import tkinter as tk
 from tkinter import ttk
 
-from math_sim.engines.maze import SOLVERS
 from math_sim.ui import theme
 from math_sim.upd.ui.maze.commander import MazeUiCommander
 
@@ -16,14 +15,19 @@ GENERATOR_LABELS = {
     "Binary Tree": "binary_tree",
     "Sidewinder": "sidewinder",
     "Growing Tree": "growing_tree",
+    "Aldous-Broder": "aldous_broder",
+    "Wilson": "wilson",
 }
 SOLVER_LABELS = {
     "A*": "astar",
     "BFS": "bfs",
+    "Bidirectional BFS": "bidirectional_bfs",
     "DFS": "dfs",
     "Greedy Best-First": "greedy",
     "Left-hand Rule": "left_hand",
     "Right-hand Rule": "right_hand",
+    "Dead-End Filling": "dead_end",
+    "Random Mouse": "random_mouse",
 }
 
 NORTH, EAST, SOUTH, WEST = 1, 2, 4, 8
