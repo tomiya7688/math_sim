@@ -4,8 +4,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <functional>
 #include <limits>
 #include <queue>
+#include <random>
 #include <stack>
 #include <string>
 #include <utility>
@@ -46,6 +49,22 @@ inline SolveResult bfs(const Maze& m, Point start, Point goal) {
     SolveResult r; r.visited=visited; r.found=seen[static_cast<std::size_t>(g)]!=0; if(r.found) r.path=reconstruct(m,parent,s,g); return r;
 }
 
+inline SolveResult bidirectional_bfs(const Maze& m, Point start, Point goal) {
+    const int n=m.width*m.height,s=m.index(start.x,start.y),g=m.index(goal.x,goal.y);
+    if(s==g) return {true,1,{start}};
+    std::vector<int> ps(static_cast<std::size_t>(n),-1), pg(static_cast<std::size_t>(n),-1);
+    std::vector<char> ss(static_cast<std::size_t>(n),0), sg(static_cast<std::size_t>(n),0);
+    std::queue<int> qs,qg; qs.push(s); qg.push(g); ss[s]=1; sg[g]=1; std::size_t visited=0; int meet=-1;
+    auto expand=[&](std::queue<int>& q,std::vector<char>& own,const std::vector<char>& other,std::vector<int>& parent)->int{
+        if(q.empty()) return -1; int idx=q.front(); q.pop(); ++visited; Point p{idx%m.width,idx/m.width};
+        for(auto nb:maze::neighbors(m,p)){int ni=m.index(nb.x,nb.y); if(own[static_cast<std::size_t>(ni)]) continue; own[static_cast<std::size_t>(ni)]=1; parent[static_cast<std::size_t>(ni)]=idx; if(other[static_cast<std::size_t>(ni)]) return ni; q.push(ni);} return -1;
+    };
+    while(!qs.empty()&&!qg.empty()&&meet<0){meet=qs.size()<=qg.size()?expand(qs,ss,sg,ps):expand(qg,sg,ss,pg);}
+    SolveResult r; r.visited=visited; r.found=meet>=0; if(!r.found) return r;
+    auto left=reconstruct(m,ps,s,meet); std::vector<Point> right; for(int cur=meet;cur!=g;){cur=pg[static_cast<std::size_t>(cur)]; if(cur<0) return {}; right.push_back({cur%m.width,cur/m.width});}
+    r.path=std::move(left); r.path.insert(r.path.end(),right.begin(),right.end()); return r;
+}
+
 inline SolveResult dfs(const Maze& m, Point start, Point goal) {
     int n=m.width*m.height,s=m.index(start.x,start.y),g=m.index(goal.x,goal.y);
     std::vector<int> parent(static_cast<std::size_t>(n),-1); std::vector<char> seen(static_cast<std::size_t>(n),0); std::stack<int> st;
@@ -70,7 +89,6 @@ inline SolveResult greedy(const Maze& m, Point start, Point goal) {
 }
 
 inline SolveResult wall_follower(const Maze& m, Point start, Point goal, bool left_hand) {
-    // Direction order: N,E,S,W. Start facing east.
     static const int dx[4]={0,1,0,-1}; static const int dy[4]={-1,0,1,0};
     Point p=start; int dir=1; std::vector<Point> path{p}; std::size_t visited=1;
     const std::size_t limit=static_cast<std::size_t>(m.width*m.height*16);
@@ -85,14 +103,36 @@ inline SolveResult wall_follower(const Maze& m, Point start, Point goal, bool le
     SolveResult r; r.visited=visited; r.found=(p.x==goal.x&&p.y==goal.y); if(r.found) r.path=std::move(path); return r;
 }
 
-inline SolveResult solve(const Maze& m, Point start, Point goal, const std::string& algorithm) {
+inline SolveResult dead_end_filling(const Maze& m, Point start, Point goal) {
+    const int n=m.width*m.height,s=m.index(start.x,start.y),g=m.index(goal.x,goal.y);
+    std::vector<char> removed(static_cast<std::size_t>(n),0); std::queue<int> q;
+    auto degree=[&](int idx){Point p{idx%m.width,idx/m.width}; int d=0; for(auto nb:maze::neighbors(m,p)) if(!removed[static_cast<std::size_t>(m.index(nb.x,nb.y))]) ++d; return d;};
+    for(int i=0;i<n;++i) if(i!=s&&i!=g&&degree(i)<=1) q.push(i);
+    std::size_t visited=0;
+    while(!q.empty()){int idx=q.front(); q.pop(); if(removed[static_cast<std::size_t>(idx)]||idx==s||idx==g||degree(idx)>1) continue; removed[static_cast<std::size_t>(idx)]=1; ++visited; Point p{idx%m.width,idx/m.width}; for(auto nb:maze::neighbors(m,p)){int ni=m.index(nb.x,nb.y); if(ni!=s&&ni!=g&&!removed[static_cast<std::size_t>(ni)]&&degree(ni)<=1) q.push(ni);}}
+    std::vector<Point> path; int cur=s,prev=-1; path.push_back(start); const std::size_t limit=static_cast<std::size_t>(n+1);
+    for(std::size_t k=0;k<limit&&cur!=g;++k){Point p{cur%m.width,cur/m.width}; int next=-1; for(auto nb:maze::neighbors(m,p)){int ni=m.index(nb.x,nb.y); if(ni!=prev&&!removed[static_cast<std::size_t>(ni)]){next=ni; break;}} if(next<0) break; prev=cur; cur=next; path.push_back({cur%m.width,cur/m.width});}
+    SolveResult r; r.visited=visited; r.found=cur==g; if(r.found) r.path=std::move(path); return r;
+}
+
+inline SolveResult random_mouse(const Maze& m, Point start, Point goal, std::uint64_t seed) {
+    std::mt19937_64 rng(seed); Point p=start; std::vector<Point> path{p}; std::size_t visited=1;
+    const std::size_t limit=static_cast<std::size_t>(m.width*m.height)*200;
+    for(std::size_t i=0;i<limit&&!(p.x==goal.x&&p.y==goal.y);++i){auto ns=maze::neighbors(m,p); if(ns.empty()) break; std::uniform_int_distribution<std::size_t> pick(0,ns.size()-1); p=ns[pick(rng)]; path.push_back(p); ++visited;}
+    SolveResult r; r.visited=visited; r.found=(p.x==goal.x&&p.y==goal.y); if(r.found) r.path=std::move(path); return r;
+}
+
+inline SolveResult solve(const Maze& m, Point start, Point goal, const std::string& algorithm, std::uint64_t seed = 0) {
     if(!m.in_bounds(start.x,start.y)||!m.in_bounds(goal.x,goal.y)) throw std::invalid_argument("start/goal out of bounds");
     if(algorithm=="bfs") return bfs(m,start,goal);
+    if(algorithm=="bidirectional_bfs") return bidirectional_bfs(m,start,goal);
     if(algorithm=="dfs") return dfs(m,start,goal);
     if(algorithm=="astar") return a_star(m,start,goal);
     if(algorithm=="greedy") return greedy(m,start,goal);
     if(algorithm=="left_hand") return wall_follower(m,start,goal,true);
     if(algorithm=="right_hand") return wall_follower(m,start,goal,false);
+    if(algorithm=="dead_end") return dead_end_filling(m,start,goal);
+    if(algorithm=="random_mouse") return random_mouse(m,start,goal,seed);
     throw std::invalid_argument("unknown maze solver");
 }
 
