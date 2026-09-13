@@ -2,47 +2,9 @@
 
 This simulation separates **map generation** from **route search** so the same grid model can be reused by multiple algorithms.
 
-## Map generator
+## Standard grid
 
-`cpp/include/math_sim/grid_map.hpp` provides a weighted rectangular grid.
-
-Each cell has:
-
-- `blocked`: whether the cell is an obstacle
-- `cost`: traversal cost for entering the cell
-
-`generate_random_map(...)` accepts width, height, obstacle probability, terrain-cost range, and seed. The same seed and parameters reproduce the same map.
-
-The default start is the top-left cell and the goal is the bottom-right cell.
-
-## Core algorithms
-
-`cpp/include/math_sim/pathfinding.hpp` exposes:
-
-- `dijkstra(...)`: optimal for non-negative weighted maps
-- `bidirectional_dijkstra(...)`: weighted search from both ends
-- `a_star(...)`: Manhattan-heuristic A* with optimality on the current positive-cost grid
-- `weighted_a_star(...)`: stronger heuristic bias; may sacrifice optimality
-- `bfs(...)`: unweighted minimum-step search
-- `bidirectional_bfs(...)`: unweighted search from both ends
-- `dfs(...)`: depth-first baseline
-- `greedy_best_first(...)`: heuristic-only goal-directed search
-
-## Additional algorithms
-
-`cpp/include/math_sim/pathfinding_extra.hpp` contains algorithms that have different performance or memory characteristics:
-
-- `bellman_ford(...)`: repeated relaxation baseline; useful for comparison with algorithms designed for weighted graphs
-- `spfa(...)`: queue-based Bellman-Ford variant
-- `iterative_deepening_dfs(...)`: repeated depth-limited DFS with low memory use
-- `ida_star(...)`: iterative-deepening A*; trades repeated work for low memory consumption
-- `fringe_search(...)`: threshold-based heuristic search related to IDA* and A*
-
-The current random map generator uses positive terrain costs, so Bellman-Ford/SPFA do not gain their usual negative-edge advantage here; they are included for algorithmic comparison.
-
-All methods return `SearchResult` containing whether a route was found, visited-node count, route cost, and path coordinates.
-
-## Parent application
+`cpp/include/math_sim/grid_map.hpp` provides the original positive weighted rectangular grid.
 
 The Tkinter `Path Finding` page currently exposes 13 algorithms:
 
@@ -60,10 +22,77 @@ The Tkinter `Path Finding` page currently exposes 13 algorithms:
 - IDA*
 - Fringe Search
 
-`COMPARE ALL` runs each method against identical generated-map parameters and the same random seed, making path cost and visited-node count directly comparable.
+`COMPARE ALL` runs each method against identical generated-map parameters and the same random seed.
 
-## Interpretation
+## Advanced grid
 
-Dijkstra is the weighted optimal baseline. A* normally preserves that cost while reducing the search region. Bidirectional methods may reduce work on long source-to-goal routes. Weighted A* and Greedy Best-First deliberately prioritize more aggressive goal-directed exploration. BFS variants show behavior when weights are ignored. DFS and IDDFS demonstrate depth-oriented traversal. IDA* and Fringe Search are useful when memory usage matters. Bellman-Ford and SPFA provide relaxation-based weighted-graph baselines.
+`cpp/include/math_sim/grid_map_advanced.hpp` adds a second map model for richer experiments without breaking the standard grid API.
 
-Future extensions can add diagonal movement, integer/0-1 terrain generators, dynamic obstacle updates, Jump Point Search, and D* Lite without changing the UI/Process boundary.
+Each advanced cell can represent:
+
+- blocked / traversable state
+- base traversal cost
+- one-way exit direction mask
+- time-varying traversal-cost amplitude, period, and phase
+
+The generator supports these cost profiles:
+
+- `continuous`: real-valued positive terrain costs
+- `integer`: bounded integer terrain costs
+- `zero_one`: terrain costs restricted to 0 or 1
+
+Advanced maps can also randomly generate one-way cells and time-varying cells.
+
+## Advanced movement and algorithms
+
+`cpp/include/math_sim/pathfinding_advanced.hpp` supports:
+
+- 4-way movement
+- 8-way movement with diagonal corner-cut prevention
+- one-way movement restrictions
+- optional time-varying traversal costs
+- Dijkstra on the advanced grid
+- A* with Manhattan or octile-style heuristic depending on movement mode
+- 0-1 BFS for 0/1 maps
+- Dial's algorithm for bounded non-negative integer-cost maps
+
+0-1 BFS and Dial currently use 4-way movement because their optimized bucket/deque assumptions are kept explicit in the first implementation.
+
+The dedicated executable is `pathfinding_advanced`, and Python callers can use:
+
+```python
+from math_sim.engines.pathfinding_advanced import solve_advanced_map
+```
+
+Important parameters include:
+
+- `cost_profile="continuous" | "integer" | "zero_one"`
+- `diagonal=True | False`
+- `one_way_probability`
+- `dynamic_probability`
+- `dynamic_amplitude`
+- `dynamic_period`
+- `dynamic_costs=True | False`
+- `start_time`
+
+## Architecture
+
+The standard pathfinding page already uses the UPD Commander path:
+
+```text
+UI Processing
+  -> UI Commander
+  -> UI Messenger
+  -> Process Messenger
+  -> Process Commander
+  -> Process Processing
+  -> native C++ engine
+```
+
+The advanced engine is kept behind the same Python/native boundary so it can be moved behind the UPD Process layer without coupling the UI to C++.
+
+## Next incremental-search phase
+
+Jump Point Search, LPA*, and D* Lite are intentionally not implemented as aliases or fallbacks. They require additional algorithm-specific state and, for LPA*/D* Lite, explicit map-change events so their incremental behavior can be measured correctly.
+
+The advanced grid now contains the movement and dynamic-cost primitives needed for that next phase.
