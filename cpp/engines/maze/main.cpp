@@ -43,6 +43,8 @@ int main(int argc,char* argv[]){
                  <<",\"visited\":"<<result.visited<<",\"optimal_steps\":"<<(optimal.path.empty()?0:optimal.path.size()-1)<<",\"walls\":[";
         for(std::size_t i=0;i<m.cells.size();++i){if(i) std::cout<<','; std::cout<<static_cast<int>(m.cells[i].walls);} std::cout<<"],\"path\":[";
         for(std::size_t i=0;i<result.path.size();++i){if(i) std::cout<<','; std::cout<<'['<<result.path[i].x<<','<<result.path[i].y<<']';}
+        std::cout<<"],\"trace\":[";
+        for(std::size_t i=0;i<result.trace.size();++i){if(i) std::cout<<','; std::cout<<'['<<result.trace[i].x<<','<<result.trace[i].y<<']';}
         std::cout<<"],\"optimal_path\":[";
         for(std::size_t i=0;i<optimal.path.size();++i){if(i) std::cout<<','; std::cout<<'['<<optimal.path[i].x<<','<<optimal.path[i].y<<']';}
         std::cout<<"]}\n";
