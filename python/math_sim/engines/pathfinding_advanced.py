@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 
-ALGORITHMS = ("dijkstra", "astar", "zero_one_bfs", "dial")
+ALGORITHMS = ("dijkstra", "astar", "zero_one_bfs", "dial", "jps")
 COST_PROFILES = ("continuous", "integer", "zero_one")
 
 
@@ -64,6 +64,15 @@ def solve_advanced_map(
         raise ValueError("dial requires cost_profile='integer'")
     if (algorithm in {"zero_one_bfs", "dial"}) and diagonal:
         raise ValueError(f"{algorithm} currently supports 4-way movement only")
+    if algorithm == "jps":
+        if not diagonal:
+            raise ValueError("jps requires diagonal=True")
+        if one_way_probability != 0.0 or dynamic_probability != 0.0 or dynamic_costs:
+            raise ValueError("jps requires a static grid without one-way restrictions")
+        if min_cost != max_cost:
+            raise ValueError("jps requires uniform terrain cost; set min_cost == max_cost")
+        if cost_profile == "zero_one":
+            raise ValueError("jps requires a positive uniform cost profile")
 
     command = [
         str(resolve_engine_path()),
