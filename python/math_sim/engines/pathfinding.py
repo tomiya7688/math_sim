@@ -7,7 +7,21 @@ from pathlib import Path
 from typing import Any
 
 
-ALGORITHMS = ("dijkstra", "astar", "bfs", "greedy")
+ALGORITHMS = (
+    "dijkstra",
+    "bidijkstra",
+    "astar",
+    "weighted_astar",
+    "bfs",
+    "bibfs",
+    "dfs",
+    "greedy",
+    "bellman_ford",
+    "spfa",
+    "iddfs",
+    "ida_star",
+    "fringe",
+)
 
 
 def _engine_name() -> str:
