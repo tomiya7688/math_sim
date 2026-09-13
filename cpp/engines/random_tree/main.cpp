@@ -1,67 +1,15 @@
+#include "math_sim/random_tree.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-namespace random_tree {
-
-struct Segment {
-    double x1;
-    double y1;
-    double x2;
-    double y2;
-    int depth;
-};
-
-struct BranchSpec {
-    double length;
-    double angle;
-};
-
-using BranchRule = std::function<std::vector<BranchSpec>(
-    std::mt19937_64&,
-    double current_length,
-    double current_angle,
-    int depth
-)>;
-
-void grow_tree(
-    std::vector<Segment>& segments,
-    std::mt19937_64& rng,
-    double x,
-    double y,
-    double length,
-    double angle,
-    int depth,
-    const BranchRule& branch_rule
-) {
-    if (depth <= 0) {
-        return;
-    }
-
-    const double x2 = x + std::cos(angle) * length;
-    const double y2 = y + std::sin(angle) * length;
-    segments.push_back({x, y, x2, y2, depth});
-
-    if (depth == 1) {
-        return;
-    }
-
-    for (const BranchSpec& next : branch_rule(rng, length, angle, depth)) {
-        if (next.length > 0.0) {
-            grow_tree(segments, rng, x2, y2, next.length, next.angle, depth - 1, branch_rule);
-        }
-    }
-}
-
-}  // namespace random_tree
 
 namespace {
 
@@ -86,21 +34,14 @@ Options parse_args(int argc, char* argv[]) {
             return argv[++i];
         };
 
-        if (arg == "--depth") {
-            options.depth = std::stoi(require_value(arg));
-        } else if (arg == "--seed") {
-            options.seed = std::stoull(require_value(arg));
-        } else if (arg == "--length") {
-            options.length = std::stod(require_value(arg));
-        } else if (arg == "--length-decay") {
-            options.length_decay = std::stod(require_value(arg));
-        } else if (arg == "--branch-angle") {
-            options.branch_angle_deg = std::stod(require_value(arg));
-        } else if (arg == "--angle-jitter") {
-            options.angle_jitter_deg = std::stod(require_value(arg));
-        } else if (arg == "--length-jitter") {
-            options.length_jitter = std::stod(require_value(arg));
-        } else if (arg == "--help") {
+        if (arg == "--depth") options.depth = std::stoi(require_value(arg));
+        else if (arg == "--seed") options.seed = std::stoull(require_value(arg));
+        else if (arg == "--length") options.length = std::stod(require_value(arg));
+        else if (arg == "--length-decay") options.length_decay = std::stod(require_value(arg));
+        else if (arg == "--branch-angle") options.branch_angle_deg = std::stod(require_value(arg));
+        else if (arg == "--angle-jitter") options.angle_jitter_deg = std::stod(require_value(arg));
+        else if (arg == "--length-jitter") options.length_jitter = std::stod(require_value(arg));
+        else if (arg == "--help") {
             std::cout << "Usage: random_tree [--depth N] [--seed N] [--length X] "
                          "[--length-decay X] [--branch-angle DEG] [--angle-jitter DEG] "
                          "[--length-jitter X]\n";
@@ -110,18 +51,10 @@ Options parse_args(int argc, char* argv[]) {
         }
     }
 
-    if (options.depth < 1 || options.depth > 18) {
-        throw std::invalid_argument("--depth must be between 1 and 18");
-    }
-    if (options.length <= 0.0) {
-        throw std::invalid_argument("--length must be greater than 0");
-    }
-    if (options.length_decay <= 0.0 || options.length_decay >= 1.0) {
-        throw std::invalid_argument("--length-decay must be between 0 and 1");
-    }
-    if (options.length_jitter < 0.0 || options.length_jitter >= 1.0) {
-        throw std::invalid_argument("--length-jitter must be in [0, 1)");
-    }
+    if (options.depth < 1 || options.depth > 18) throw std::invalid_argument("--depth must be between 1 and 18");
+    if (options.length <= 0.0) throw std::invalid_argument("--length must be greater than 0");
+    if (options.length_decay <= 0.0 || options.length_decay >= 1.0) throw std::invalid_argument("--length-decay must be between 0 and 1");
+    if (options.length_jitter < 0.0 || options.length_jitter >= 1.0) throw std::invalid_argument("--length-jitter must be in [0, 1)");
     return options;
 }
 
@@ -131,50 +64,38 @@ int main(int argc, char* argv[]) {
     try {
         const Options options = parse_args(argc, argv);
         std::mt19937_64 rng(options.seed);
-        std::vector<random_tree::Segment> segments;
+        std::vector<math_sim::random_tree::Segment> segments;
         segments.reserve((1u << std::min(options.depth, 20)) - 1u);
 
         constexpr double pi = 3.14159265358979323846;
         const double base_branch = options.branch_angle_deg * pi / 180.0;
 
-        random_tree::BranchRule rule = [&](std::mt19937_64& local_rng, double current_length, double current_angle, int) {
+        math_sim::random_tree::BranchRule rule = [&](std::mt19937_64& local_rng, double current_length, double current_angle, int) {
             std::uniform_real_distribution<double> angle_jitter(-options.angle_jitter_deg, options.angle_jitter_deg);
-            std::uniform_real_distribution<double> length_scale(
-                1.0 - options.length_jitter,
-                1.0 + options.length_jitter
-            );
+            std::uniform_real_distribution<double> length_scale(1.0 - options.length_jitter, 1.0 + options.length_jitter);
 
-            const double left_jitter = angle_jitter(local_rng) * pi / 180.0;
-            const double right_jitter = angle_jitter(local_rng) * pi / 180.0;
-            return std::vector<random_tree::BranchSpec>{
-                {current_length * options.length_decay * length_scale(local_rng), current_angle + base_branch + left_jitter},
-                {current_length * options.length_decay * length_scale(local_rng), current_angle - base_branch + right_jitter},
+            return std::vector<math_sim::random_tree::BranchSpec>{
+                {current_length * options.length_decay * length_scale(local_rng),
+                 current_angle + base_branch + angle_jitter(local_rng) * pi / 180.0},
+                {current_length * options.length_decay * length_scale(local_rng),
+                 current_angle - base_branch + angle_jitter(local_rng) * pi / 180.0},
             };
         };
 
-        random_tree::grow_tree(
-            segments,
-            rng,
-            0.0,
-            0.0,
-            options.length,
-            -pi / 2.0,
-            options.depth,
-            rule
+        math_sim::random_tree::grow_tree(
+            segments, rng, 0.0, 0.0, options.length, -pi / 2.0, options.depth, rule
         );
 
-        std::cout << std::setprecision(17);
-        std::cout << "{\"simulation\":\"random_tree\","
+        std::cout << std::setprecision(17)
+                  << "{\"simulation\":\"random_tree\","
                   << "\"seed\":" << options.seed << ","
                   << "\"depth\":" << options.depth << ","
                   << "\"segments\":[";
 
         for (std::size_t i = 0; i < segments.size(); ++i) {
             const auto& s = segments[i];
-            if (i != 0) {
-                std::cout << ',';
-            }
-            std::cout << "[" << s.x1 << ',' << s.y1 << ',' << s.x2 << ',' << s.y2 << ',' << s.depth << "]";
+            if (i != 0) std::cout << ',';
+            std::cout << '[' << s.x1 << ',' << s.y1 << ',' << s.x2 << ',' << s.y2 << ',' << s.depth << ']';
         }
 
         std::cout << "]}\n";
