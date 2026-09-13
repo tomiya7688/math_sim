@@ -11,6 +11,11 @@ _processing.ALGORITHM_LABELS = {
     "Bidirectional BFS": "bibfs",
     "DFS": "dfs",
     "Greedy Best-First": "greedy",
+    "Bellman-Ford": "bellman_ford",
+    "SPFA": "spfa",
+    "Iterative Deepening DFS": "iddfs",
+    "IDA*": "ida_star",
+    "Fringe Search": "fringe",
 }
 
 build_pathfinding_page = _processing.build_pathfinding_page
