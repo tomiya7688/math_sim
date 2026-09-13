@@ -1,5 +1,6 @@
 #include "math_sim/grid_map.hpp"
 #include "math_sim/pathfinding.hpp"
+#include "math_sim/pathfinding_extra.hpp"
 
 #include <cstdint>
 #include <cstdlib>
@@ -39,7 +40,8 @@ Options parse_args(int argc, char* argv[]) {
         else if (arg == "--help") {
             std::cout << "Usage: pathfinding [--width N] [--height N] [--obstacles P] "
                          "[--min-cost X] [--max-cost X] [--seed N] "
-                         "[--algorithm dijkstra|bidijkstra|astar|weighted_astar|bfs|bibfs|dfs|greedy]\n";
+                         "[--algorithm dijkstra|bidijkstra|astar|weighted_astar|bfs|bibfs|dfs|greedy|"
+                         "bellman_ford|spfa|iddfs|ida_star|fringe]\n";
             std::exit(0);
         } else throw std::invalid_argument("unknown argument: " + arg);
     }
@@ -47,6 +49,11 @@ Options parse_args(int argc, char* argv[]) {
         throw std::invalid_argument("grid dimensions out of range");
     }
     return o;
+}
+
+bool is_extra_algorithm(const std::string& algorithm) {
+    return algorithm == "bellman_ford" || algorithm == "spfa" ||
+           algorithm == "iddfs" || algorithm == "ida_star" || algorithm == "fringe";
 }
 
 void print_json(const math_sim::grid::GridMap& map,
@@ -90,7 +97,9 @@ int main(int argc, char* argv[]) {
         );
         const math_sim::pathfinding::Point start{0, 0};
         const math_sim::pathfinding::Point goal{options.width - 1, options.height - 1};
-        const auto result = math_sim::pathfinding::solve(map, start, goal, options.algorithm);
+        const auto result = is_extra_algorithm(options.algorithm)
+            ? math_sim::pathfinding::extra::solve(map, start, goal, options.algorithm)
+            : math_sim::pathfinding::solve(map, start, goal, options.algorithm);
         print_json(map, result, options);
         return 0;
     } catch (const std::exception& e) {
