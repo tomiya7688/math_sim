@@ -3,6 +3,7 @@
 #include "math_sim/maze.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <numeric>
 #include <random>
 #include <stack>
@@ -116,6 +117,84 @@ inline Maze growing_tree(int width, int height, std::uint64_t seed, double newes
     return m;
 }
 
+inline Maze aldous_broder(int width, int height, std::uint64_t seed) {
+    Maze m(width, height); std::mt19937_64 rng(seed);
+    const int total = width * height;
+    std::uniform_int_distribution<int> start_pick(0, total - 1);
+    int start_idx = start_pick(rng);
+    Point current{start_idx % width, start_idx / width};
+    std::vector<char> seen(static_cast<std::size_t>(total), 0);
+    seen[static_cast<std::size_t>(start_idx)] = 1;
+    int visited = 1;
+    while (visited < total) {
+        auto choices = raw_neighbors(m, current);
+        std::uniform_int_distribution<std::size_t> pick(0, choices.size() - 1);
+        Point next = choices[pick(rng)];
+        int ni = m.index(next.x, next.y);
+        if (!seen[static_cast<std::size_t>(ni)]) {
+            maze::remove_wall(m, current, next);
+            seen[static_cast<std::size_t>(ni)] = 1;
+            ++visited;
+        }
+        current = next;
+    }
+    return m;
+}
+
+inline Maze wilson(int width, int height, std::uint64_t seed) {
+    Maze m(width, height); std::mt19937_64 rng(seed);
+    const int total = width * height;
+    std::vector<char> in_tree(static_cast<std::size_t>(total), 0);
+    std::uniform_int_distribution<int> root_pick(0, total - 1);
+    in_tree[static_cast<std::size_t>(root_pick(rng))] = 1;
+    int tree_count = 1;
+
+    while (tree_count < total) {
+        std::vector<int> unvisited;
+        unvisited.reserve(static_cast<std::size_t>(total - tree_count));
+        for (int i = 0; i < total; ++i) if (!in_tree[static_cast<std::size_t>(i)]) unvisited.push_back(i);
+        std::uniform_int_distribution<std::size_t> start_pick(0, unvisited.size() - 1);
+        int start_idx = unvisited[start_pick(rng)];
+        Point current{start_idx % width, start_idx / width};
+        std::vector<Point> walk{current};
+        std::vector<int> position(static_cast<std::size_t>(total), -1);
+        position[static_cast<std::size_t>(start_idx)] = 0;
+
+        while (true) {
+            auto choices = raw_neighbors(m, current);
+            std::uniform_int_distribution<std::size_t> pick(0, choices.size() - 1);
+            Point next = choices[pick(rng)];
+            int ni = m.index(next.x, next.y);
+            if (in_tree[static_cast<std::size_t>(ni)]) {
+                walk.push_back(next);
+                break;
+            }
+            int old_pos = position[static_cast<std::size_t>(ni)];
+            if (old_pos >= 0) {
+                for (std::size_t j = static_cast<std::size_t>(old_pos + 1); j < walk.size(); ++j) {
+                    int old_idx = m.index(walk[j].x, walk[j].y);
+                    position[static_cast<std::size_t>(old_idx)] = -1;
+                }
+                walk.resize(static_cast<std::size_t>(old_pos + 1));
+            } else {
+                position[static_cast<std::size_t>(ni)] = static_cast<int>(walk.size());
+                walk.push_back(next);
+            }
+            current = next;
+        }
+
+        for (std::size_t i = 0; i + 1 < walk.size(); ++i) {
+            maze::remove_wall(m, walk[i], walk[i + 1]);
+            int idx = m.index(walk[i].x, walk[i].y);
+            if (!in_tree[static_cast<std::size_t>(idx)]) {
+                in_tree[static_cast<std::size_t>(idx)] = 1;
+                ++tree_count;
+            }
+        }
+    }
+    return m;
+}
+
 inline Maze generate(int width, int height, std::uint64_t seed, const std::string& algorithm) {
     if (algorithm=="backtracker") return recursive_backtracker(width,height,seed);
     if (algorithm=="prim") return randomized_prim(width,height,seed);
@@ -123,6 +202,8 @@ inline Maze generate(int width, int height, std::uint64_t seed, const std::strin
     if (algorithm=="binary_tree") return binary_tree(width,height,seed);
     if (algorithm=="sidewinder") return sidewinder(width,height,seed);
     if (algorithm=="growing_tree") return growing_tree(width,height,seed);
+    if (algorithm=="aldous_broder") return aldous_broder(width,height,seed);
+    if (algorithm=="wilson") return wilson(width,height,seed);
     throw std::invalid_argument("unknown maze generator");
 }
 
