@@ -15,25 +15,36 @@ Each cell has:
 
 The default start is the top-left cell and the goal is the bottom-right cell.
 
-## Algorithms
+## Core algorithms
 
-`cpp/include/math_sim/pathfinding.hpp` exposes reusable functions:
+`cpp/include/math_sim/pathfinding.hpp` exposes:
 
-- `dijkstra(...)`: optimal for non-negative weighted maps; no heuristic
-- `bidirectional_dijkstra(...)`: searches from both start and goal; weighted and optimal for the current grid model
-- `a_star(...)`: optimal for the current positive weighted grid while using a Manhattan heuristic
-- `weighted_a_star(...)`: increases heuristic influence to reduce search effort; may sacrifice optimality
-- `bfs(...)`: minimizes number of grid steps and ignores terrain weights during search
-- `bidirectional_bfs(...)`: unweighted shortest-step search from both ends
-- `dfs(...)`: depth-first baseline; neither shortest-path nor minimum-cost optimality is guaranteed
-- `greedy_best_first(...)`: follows only the heuristic; often explores fewer cells but is not guaranteed to find the cheapest path
-- `solve(...)`: common dispatcher by algorithm name
+- `dijkstra(...)`: optimal for non-negative weighted maps
+- `bidirectional_dijkstra(...)`: weighted search from both ends
+- `a_star(...)`: Manhattan-heuristic A* with optimality on the current positive-cost grid
+- `weighted_a_star(...)`: stronger heuristic bias; may sacrifice optimality
+- `bfs(...)`: unweighted minimum-step search
+- `bidirectional_bfs(...)`: unweighted search from both ends
+- `dfs(...)`: depth-first baseline
+- `greedy_best_first(...)`: heuristic-only goal-directed search
 
-All methods return `SearchResult` containing whether a route was found, the visited-node count, route cost, and path coordinates.
+## Additional algorithms
+
+`cpp/include/math_sim/pathfinding_extra.hpp` contains algorithms that have different performance or memory characteristics:
+
+- `bellman_ford(...)`: repeated relaxation baseline; useful for comparison with algorithms designed for weighted graphs
+- `spfa(...)`: queue-based Bellman-Ford variant
+- `iterative_deepening_dfs(...)`: repeated depth-limited DFS with low memory use
+- `ida_star(...)`: iterative-deepening A*; trades repeated work for low memory consumption
+- `fringe_search(...)`: threshold-based heuristic search related to IDA* and A*
+
+The current random map generator uses positive terrain costs, so Bellman-Ford/SPFA do not gain their usual negative-edge advantage here; they are included for algorithmic comparison.
+
+All methods return `SearchResult` containing whether a route was found, visited-node count, route cost, and path coordinates.
 
 ## Parent application
 
-The Tkinter `Path Finding` page can generate one weighted random map and compare:
+The Tkinter `Path Finding` page currently exposes 13 algorithms:
 
 - Dijkstra
 - Bidirectional Dijkstra
@@ -43,9 +54,16 @@ The Tkinter `Path Finding` page can generate one weighted random map and compare
 - Bidirectional BFS
 - DFS
 - Greedy Best-First
+- Bellman-Ford
+- SPFA
+- Iterative Deepening DFS
+- IDA*
+- Fringe Search
 
-`COMPARE ALL` runs every method with the same map parameters and random seed so visited-node count, path cost, and path shape can be compared directly.
+`COMPARE ALL` runs each method against identical generated-map parameters and the same random seed, making path cost and visited-node count directly comparable.
 
 ## Interpretation
 
-Dijkstra is the weighted optimal baseline. A* should normally retain the same optimal cost while visiting fewer cells. Bidirectional variants can reduce search effort when the start and goal are far apart. Weighted A* and Greedy Best-First deliberately trade optimality for more aggressive goal-directed search. BFS and Bidirectional BFS are useful unweighted baselines. DFS is included mainly as a contrast because its result depends strongly on traversal order and does not optimize path length or terrain cost.
+Dijkstra is the weighted optimal baseline. A* normally preserves that cost while reducing the search region. Bidirectional methods may reduce work on long source-to-goal routes. Weighted A* and Greedy Best-First deliberately prioritize more aggressive goal-directed exploration. BFS variants show behavior when weights are ignored. DFS and IDDFS demonstrate depth-oriented traversal. IDA* and Fringe Search are useful when memory usage matters. Bellman-Ford and SPFA provide relaxation-based weighted-graph baselines.
+
+Future extensions can add diagonal movement, integer/0-1 terrain generators, dynamic obstacle updates, Jump Point Search, and D* Lite without changing the UI/Process boundary.
