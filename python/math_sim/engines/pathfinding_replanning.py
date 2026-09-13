@@ -41,6 +41,7 @@ def simulate_replanning(
     seed: int = 42,
     algorithm: str = "lpa_star",
     diagonal: bool = False,
+    block_cell: tuple[int, int] | None = None,
 ) -> dict[str, Any]:
     algorithm = algorithm.lower()
     if algorithm not in ALGORITHMS:
@@ -55,6 +56,10 @@ def simulate_replanning(
         "--algorithm", algorithm,
         "--diagonal", "1" if diagonal else "0",
     ]
+    if block_cell is not None:
+        x, y = block_cell
+        command.extend(["--block-x", str(x), "--block-y", str(y)])
+
     completed = subprocess.run(
         command,
         check=True,
