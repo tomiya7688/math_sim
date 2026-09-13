@@ -16,7 +16,7 @@ The native executable is `maze`. Python calls it through `python/math_sim/engine
 
 ## Generators
 
-The initial generator set contains:
+The current generator set contains eight algorithms:
 
 - Recursive Backtracker — long corridors and strong depth-first character
 - Randomized Prim — more branching and a broader frontier
@@ -24,23 +24,28 @@ The initial generator set contains:
 - Binary Tree — very fast and strongly biased
 - Sidewinder — row-oriented generation with recognizable horizontal runs
 - Growing Tree — mixes newest-cell and random-cell selection; currently uses a 0.7 newest-cell bias
+- Aldous-Broder — random-walk uniform-spanning-tree construction
+- Wilson — loop-erased random walks and uniform-spanning-tree construction
 
-All current generators create connected perfect mazes (a spanning tree over cells), making wall-following solvers meaningful.
+All current generators create connected perfect mazes (a spanning tree over cells), making wall-following and dead-end-filling solvers meaningful.
 
-Planned generator extensions include Wilson, Aldous-Broder, Eller, Recursive Division, and a user-function-controlled Growing Tree selector.
+Planned generator extensions include Eller, Recursive Division, and a user-function-controlled Growing Tree selector.
 
 ## Solvers
 
-The initial solver set contains:
+The current solver set contains nine algorithms/strategies:
 
 - BFS — shortest number of cell moves; used as the optimal-step baseline
+- Bidirectional BFS — shortest-step search expanding from both ends
 - DFS — depth-first traversal baseline
 - A* — shortest route with Manhattan heuristic
 - Greedy Best-First — heuristic-directed but not generally optimal on arbitrary graphs
 - Left-hand Rule — human-style wall following
 - Right-hand Rule — mirrored wall following
+- Dead-End Filling — repeatedly removes cul-de-sacs until the solution corridor remains
+- Random Mouse — random walk baseline with a bounded step budget
 
-Planned solver extensions include Trémaux, Dead-End Filling, Random Mouse, bidirectional search, and solver animation/event traces.
+Planned solver extensions include Trémaux and solver animation/event traces.
 
 ## Play mode
 
