@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure C++ engines
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build C++ engines
+        run: cmake --build build --config Release -j2
+      - name: Python syntax check
+        run: python -m compileall -q python/math_sim
