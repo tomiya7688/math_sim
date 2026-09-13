@@ -12,7 +12,8 @@ class ReplanningRequest:
     seed: int = 42
     algorithm: str = "lpa_star"
     diagonal: bool = False
-    block_cell: tuple[int, int] | None = None
+    change_cell: tuple[int, int] | None = None
+    change_mode: str = "auto"
 
 
 @dataclass(frozen=True)
