@@ -16,7 +16,17 @@ GENERATORS = (
     "aldous_broder",
     "wilson",
 )
-SOLVERS = ("bfs", "dfs", "astar", "greedy", "left_hand", "right_hand")
+SOLVERS = (
+    "bfs",
+    "bidirectional_bfs",
+    "dfs",
+    "astar",
+    "greedy",
+    "left_hand",
+    "right_hand",
+    "dead_end",
+    "random_mouse",
+)
 
 
 def _engine_name() -> str:
