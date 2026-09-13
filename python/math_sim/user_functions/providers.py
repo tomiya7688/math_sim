@@ -29,6 +29,14 @@ class ExpressionProvider:
         return [self._fn(row) for row in rows]
 
 
+def _python_worker_command(config: str) -> list[str]:
+    worker_name = "math_sim_function_worker.exe" if sys.platform.startswith("win") else "math_sim_function_worker"
+    packaged = Path(sys.executable).resolve().parent / "engines" / worker_name
+    if packaged.exists():
+        return [str(packaged), config]
+    return [sys.executable, "-m", "math_sim.user_functions.worker", config]
+
+
 class PythonProvider:
     def __init__(self, spec: FunctionSpec) -> None:
         spec.validate()
@@ -39,8 +47,8 @@ class PythonProvider:
     def _run(self, request: dict[str, Any]) -> dict[str, Any]:
         config = json.dumps({"path": str(Path(self._spec.path or "").resolve()), "entrypoint": self._spec.entrypoint})
         completed = subprocess.run(
-            [sys.executable, "-m", "math_sim.user_functions.worker", config],
-            input=json.dumps(request), capture_output=True, text=True, encoding="utf-8",
+            _python_worker_command(config), input=json.dumps(request),
+            capture_output=True, text=True, encoding="utf-8",
             timeout=self._spec.timeout_seconds, check=True,
         )
         return json.loads(completed.stdout)
