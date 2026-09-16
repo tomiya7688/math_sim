@@ -2,6 +2,7 @@
 #include "math_sim/maze_generators.hpp"
 #include "math_sim/maze_solvers.hpp"
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iomanip>
@@ -36,13 +37,31 @@ int main(int argc,char* argv[]){
     try{
         auto o=parse_args(argc,argv);
         std::vector<math_sim::maze_generators::CarveEdge> generation_trace;
+        const auto generation_start=std::chrono::steady_clock::now();
         auto m=math_sim::maze_generators::generate(o.width,o.height,o.seed,o.generator,&generation_trace);
+        const auto generation_end=std::chrono::steady_clock::now();
+        const auto generation_us=std::chrono::duration_cast<std::chrono::microseconds>(generation_end-generation_start).count();
+
+        std::size_t dead_ends=0, junctions=0, degree_sum=0;
+        for(int y=0;y<m.height;++y){
+            for(int x=0;x<m.width;++x){
+                const auto degree=math_sim::maze::neighbors(m,{x,y}).size();
+                degree_sum+=degree;
+                if(degree==1) ++dead_ends;
+                if(degree>=3) ++junctions;
+            }
+        }
+        const double average_degree=m.cells.empty()?0.0:static_cast<double>(degree_sum)/static_cast<double>(m.cells.size());
+
         math_sim::maze::Point start{0,0}, goal{o.width-1,o.height-1};
         auto result=math_sim::maze_solvers::solve(m,start,goal,o.solver,o.seed);
         auto optimal=math_sim::maze_solvers::bfs(m,start,goal);
         std::cout<<std::setprecision(12)<<"{\"simulation\":\"maze\",\"width\":"<<m.width<<",\"height\":"<<m.height
                  <<",\"seed\":"<<o.seed<<",\"generator\":\""<<o.generator<<"\",\"solver\":\""<<o.solver<<"\",\"found\":"<<(result.found?"true":"false")
-                 <<",\"visited\":"<<result.visited<<",\"optimal_steps\":"<<(optimal.path.empty()?0:optimal.path.size()-1)<<",\"walls\":[";
+                 <<",\"visited\":"<<result.visited<<",\"optimal_steps\":"<<(optimal.path.empty()?0:optimal.path.size()-1)
+                 <<",\"generation_us\":"<<generation_us<<",\"generation_steps\":"<<generation_trace.size()
+                 <<",\"dead_ends\":"<<dead_ends<<",\"junctions\":"<<junctions<<",\"average_degree\":"<<average_degree
+                 <<",\"walls\":[";
         for(std::size_t i=0;i<m.cells.size();++i){if(i) std::cout<<','; std::cout<<static_cast<int>(m.cells[i].walls);} std::cout<<"],\"path\":[";
         for(std::size_t i=0;i<result.path.size();++i){if(i) std::cout<<','; std::cout<<'['<<result.path[i].x<<','<<result.path[i].y<<']';}
         std::cout<<"],\"trace\":[";
