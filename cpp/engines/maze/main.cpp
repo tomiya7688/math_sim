@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace {
 struct Options {
@@ -34,7 +35,8 @@ Options parse_args(int argc,char* argv[]){
 int main(int argc,char* argv[]){
     try{
         auto o=parse_args(argc,argv);
-        auto m=math_sim::maze_generators::generate(o.width,o.height,o.seed,o.generator);
+        std::vector<math_sim::maze_generators::CarveEdge> generation_trace;
+        auto m=math_sim::maze_generators::generate(o.width,o.height,o.seed,o.generator,&generation_trace);
         math_sim::maze::Point start{0,0}, goal{o.width-1,o.height-1};
         auto result=math_sim::maze_solvers::solve(m,start,goal,o.solver,o.seed);
         auto optimal=math_sim::maze_solvers::bfs(m,start,goal);
@@ -45,6 +47,8 @@ int main(int argc,char* argv[]){
         for(std::size_t i=0;i<result.path.size();++i){if(i) std::cout<<','; std::cout<<'['<<result.path[i].x<<','<<result.path[i].y<<']';}
         std::cout<<"],\"trace\":[";
         for(std::size_t i=0;i<result.trace.size();++i){if(i) std::cout<<','; std::cout<<'['<<result.trace[i].x<<','<<result.trace[i].y<<']';}
+        std::cout<<"],\"generation_trace\":[";
+        for(std::size_t i=0;i<generation_trace.size();++i){if(i) std::cout<<','; const auto& [a,b]=generation_trace[i]; std::cout<<'['<<a.x<<','<<a.y<<','<<b.x<<','<<b.y<<']';}
         std::cout<<"],\"optimal_path\":[";
         for(std::size_t i=0;i<optimal.path.size();++i){if(i) std::cout<<','; std::cout<<'['<<optimal.path[i].x<<','<<optimal.path[i].y<<']';}
         std::cout<<"]}\n";
