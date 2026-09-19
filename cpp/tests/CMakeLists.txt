@@ -1,0 +1,4 @@
+add_executable(physics_core_test physics_core_test.cpp)
+target_include_directories(physics_core_test PRIVATE ${CMAKE_SOURCE_DIR}/cpp/include)
+target_compile_features(physics_core_test PRIVATE cxx_std_17)
+add_test(NAME physics_core_test COMMAND physics_core_test)
