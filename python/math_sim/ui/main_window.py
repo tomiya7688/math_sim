@@ -3,9 +3,11 @@ from __future__ import annotations
 import threading
 import tkinter as tk
 
+from math_sim.catalog import REGISTRY
 from math_sim.engines.random_tree import generate_tree as generate_native_tree
 from math_sim.simulations.monte_carlo import integrate_expression
 from math_sim.ui import theme
+from math_sim.ui.catalog_page import LearningCatalogPage
 from math_sim.ui.maze_generator_race_page import build_maze_generator_race_page
 from math_sim.ui.maze_page import build_maze_page
 from math_sim.ui.mlp_page import build_mlp_page
@@ -22,7 +24,7 @@ class MainWindow(tk.Tk):
         self.configure(bg=theme.BG)
         self._tree_segments: list[list[float]] = []
         self._build_layout()
-        self._show_page("monte_carlo")
+        self._show_page("home")
 
     def _build_layout(self) -> None:
         shell = tk.Frame(self, bg=theme.BG)
@@ -38,6 +40,7 @@ class MainWindow(tk.Tk):
                  font=(theme.FONT_FAMILY, 8)).pack(anchor="w", padx=22, pady=(0, 24))
 
         self.nav_buttons: dict[str, tk.Button] = {}
+        self._nav_button("home", "Subjects")
         self._nav_button("monte_carlo", "Monte Carlo")
         self._nav_button("random_tree", "Random Tree")
         self._nav_button("perceptron", "Perceptron")
@@ -60,6 +63,7 @@ class MainWindow(tk.Tk):
         self.page_host.pack(fill="both", expand=True, padx=30, pady=(0, 30))
 
         self.pages = {
+            "home": LearningCatalogPage(self.page_host, REGISTRY, self._show_page),
             "monte_carlo": self._build_monte_carlo_page(),
             "random_tree": self._build_random_tree_page(),
             "perceptron": build_perceptron_page(self, self.page_host),
