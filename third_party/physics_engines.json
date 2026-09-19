@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "policy": {
+    "project_license": "MIT",
+    "preferred": ["MIT", "BSD-2-Clause", "BSD-3-Clause", "Zlib"],
+    "copyleft_runtime_dependencies_allowed": false
+  },
+  "candidates": [
+    {
+      "name": "Box2D",
+      "role": "2D rigid-body candidate",
+      "upstream": "https://github.com/erincatto/box2d",
+      "license": "MIT",
+      "bundled": false,
+      "verified": "2026-09-19",
+      "notes": "Upstream README and repository license identify MIT. Re-check exact release and transitive dependencies before bundling."
+    },
+    {
+      "name": "Jolt Physics",
+      "role": "3D rigid-body candidate",
+      "upstream": "https://github.com/jrouwe/JoltPhysics",
+      "license": "MIT",
+      "bundled": false,
+      "verified": "2026-09-19",
+      "notes": "Upstream README identifies MIT. Re-check exact release and transitive dependencies before bundling."
+    }
+  ]
+}
