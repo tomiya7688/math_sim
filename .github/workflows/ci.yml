@@ -17,7 +17,9 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Python syntax check
         run: python -m compileall -q python/math_sim
-      - name: Run registry tests
+      - name: Run dependency-free Python tests
         env:
           PYTHONPATH: python
-        run: python -m unittest discover -s tests -p "test_registry.py"
+        run: |
+          python -m unittest discover -s tests -p "test_registry.py"
+          python -m unittest discover -s tests -p "test_catalog.py"
