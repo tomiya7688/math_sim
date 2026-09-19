@@ -13,5 +13,7 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build C++ engines
         run: cmake --build build --config Release -j2
+      - name: Run C++ tests
+        run: ctest --test-dir build --output-on-failure
       - name: Python syntax check
         run: python -m compileall -q python/math_sim
