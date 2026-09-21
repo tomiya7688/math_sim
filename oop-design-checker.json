@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "failOn": "danger",
+  "ignoredPaths": [
+    "**/generated/**",
+    "**/vendor/**",
+    "**/third_party/**"
+  ],
+  "disabledRules": [],
+  "note": "Reserved for oop-design-checker when a C# target is present. Current Python architecture gate is tools/architecture/check_dependencies.py."
+}
