@@ -87,6 +87,8 @@ class LearningRegistryTests(unittest.TestCase):
                 "information",
                 "english",
                 "history",
+                "biology",
+                "health",
                 "japanese",
             ],
         )
