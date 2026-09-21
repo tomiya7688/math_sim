@@ -8,6 +8,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_ROOT = ROOT / "python" / "math_sim"
+PARENT_PROCESS_BASELINE = ROOT / "tools" / "architecture" / "parent_process_baseline.json"
 
 
 @dataclass(frozen=True)
@@ -42,10 +43,44 @@ def imported_modules(path: Path) -> list[tuple[int, str]]:
     return modules
 
 
+def load_parent_process_baseline() -> set[tuple[str, str]]:
+    if not PARENT_PROCESS_BASELINE.exists():
+        return set()
+    import json
+    data = json.loads(PARENT_PROCESS_BASELINE.read_text(encoding="utf-8"))
+    return {
+        (item["module"], item["import"])
+        for item in data.get("allowed_direct_simulation_imports", [])
+    }
+
+
 def check_file(path: Path) -> list[Violation]:
     mod = module_name(path)
     imports = imported_modules(path)
     violations: list[Violation] = []
+
+    if mod.startswith("math_sim.ui"):
+        baseline = load_parent_process_baseline()
+        for line, imported in imports:
+            if imported.startswith("math_sim.simulations"):
+                if (mod, imported) not in baseline:
+                    violations.append(
+                        Violation(
+                            path,
+                            line,
+                            "ARCH007",
+                            f"{mod}: parent/UI process must not import simulation implementation directly: {imported}",
+                        )
+                    )
+            if imported == "subprocess" or imported.startswith("subprocess."):
+                violations.append(
+                    Violation(
+                        path,
+                        line,
+                        "ARCH008",
+                        f"{mod}: UI must not launch subprocesses directly; use runtime/engine adapters",
+                    )
+                )
 
     def reject(prefixes: tuple[str, ...], rule: str, reason: str) -> None:
         for line, imported in imports:
