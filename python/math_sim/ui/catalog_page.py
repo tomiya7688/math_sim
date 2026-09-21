@@ -13,7 +13,7 @@ class LearningCatalogPage(tk.Frame):
         self,
         master: tk.Widget,
         registry: LearningRegistry,
-        open_route: Callable[[str], None],
+        open_route: Callable[[str, str | None, str | None], None],
     ) -> None:
         super().__init__(master, bg=theme.BG)
         self.registry = registry
@@ -102,7 +102,7 @@ class LearningCatalogPage(tk.Frame):
 
     def _open_search_result(self, result: SearchResult) -> None:
         if result.kind == "demo" and result.route:
-            self.open_route(result.route)
+            self.open_route(result.route, result.subject_id, result.subcategory_id)
         elif result.kind == "subject":
             self.show_subject(result.id)
         elif result.kind == "subcategory" and result.subject_id:
@@ -258,7 +258,7 @@ class LearningCatalogPage(tk.Frame):
                 grid,
                 demo.title,
                 demo.description,
-                lambda route=demo.route: self.open_route(route),
+                lambda item=demo: self.open_route(item.route, item.subject_id, item.subcategory_id),
             )
             card.grid(row=index // 2, column=index % 2, sticky="nsew", padx=6, pady=6)
         grid.grid_columnconfigure(0, weight=1, uniform="demo")
