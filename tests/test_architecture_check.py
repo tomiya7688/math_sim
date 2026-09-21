@@ -2,12 +2,14 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKER_PATH = ROOT / "tools" / "architecture" / "check_dependencies.py"
 spec = importlib.util.spec_from_file_location("architecture_check", CHECKER_PATH)
 architecture_check = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = architecture_check
 assert spec.loader is not None
 spec.loader.exec_module(architecture_check)
 
