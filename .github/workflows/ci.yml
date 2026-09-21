@@ -17,6 +17,8 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Python syntax check
         run: python -m compileall -q python/math_sim
+      - name: Architecture dependency gate
+        run: python tools/architecture/check_dependencies.py
       - name: Run dependency-free Python tests
         env:
           PYTHONPATH: python
@@ -25,3 +27,4 @@ jobs:
           python -m unittest discover -s tests -p "test_catalog.py"
           python -m unittest discover -s tests -p "test_search.py"
           python -m unittest discover -s tests -p "test_biology_registry.py"
+          python -m unittest discover -s tests -p "test_architecture_check.py"
