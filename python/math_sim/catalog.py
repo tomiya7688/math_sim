@@ -8,6 +8,7 @@ SUBCATEGORIES = (
     Subcategory("structures", "math", "構造・生成", order=20),
     Subcategory("machine_learning", "information", "機械学習", order=10),
     Subcategory("algorithms", "information", "アルゴリズム", order=20),
+    Subcategory("human_body", "biology", "人体", order=10),
 )
 
 
