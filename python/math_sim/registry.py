@@ -157,7 +157,9 @@ DEFAULT_SUBJECTS = (
     Subject("information", "情報", order=40, visible_when_empty=True),
     Subject("english", "英語", order=50, visible_when_empty=True),
     Subject("history", "歴史", order=60, visible_when_empty=True),
-    Subject("japanese", "国語", order=70, visible_when_empty=False),
+    Subject("biology", "生物", order=70, visible_when_empty=True),
+    Subject("health", "保健", order=80, visible_when_empty=False),
+    Subject("japanese", "国語", order=90, visible_when_empty=False),
 )
 
 
