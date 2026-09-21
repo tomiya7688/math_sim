@@ -1,0 +1,9 @@
+{
+  "allowed_direct_simulation_imports": [
+    {
+      "module": "math_sim.ui.main_window",
+      "import": "math_sim.simulations.monte_carlo",
+      "reason": "Legacy debt tracked by #151. Remove when expression integration is moved to an isolated engine process."
+    }
+  ]
+}
