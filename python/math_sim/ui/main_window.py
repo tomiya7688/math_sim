@@ -54,8 +54,24 @@ class MainWindow(tk.Tk):
 
         header = tk.Frame(self.main, bg=theme.BG)
         header.pack(fill="x", padx=30, pady=(26, 18))
-        tk.Label(header, text="Mathematical Simulations", bg=theme.BG, fg=theme.TEXT,
-                 font=(theme.FONT_FAMILY, 23, "bold")).pack(anchor="w")
+        top_line = tk.Frame(header, bg=theme.BG)
+        top_line.pack(fill="x")
+        tk.Label(top_line, text="Mathematical Simulations", bg=theme.BG, fg=theme.TEXT,
+                 font=(theme.FONT_FAMILY, 23, "bold")).pack(side="left")
+        tk.Button(
+            top_line,
+            text="← Back",
+            command=self._navigate_back,
+            relief="flat",
+            bd=0,
+            bg=theme.PANEL_ALT,
+            fg=theme.TEXT,
+            activebackground=theme.BORDER,
+            activeforeground=theme.TEXT,
+            cursor="hand2",
+            padx=12,
+            pady=6,
+        ).pack(side="right")
         tk.Label(header, text="Python controller + reusable simulation functions + native C++ engines",
                  bg=theme.BG, fg=theme.MUTED, font=(theme.FONT_FAMILY, 10)).pack(anchor="w", pady=(4, 0))
 
@@ -73,6 +89,29 @@ class MainWindow(tk.Tk):
             "maze_generator_race": build_maze_generator_race_page(self, self.page_host),
         }
 
+    def _open_demo(
+        self,
+        route: str,
+        subject_id: str | None = None,
+        subcategory_id: str | None = None,
+    ) -> None:
+        self.navigation.go_demo(
+            route,
+            subject_id=subject_id,
+            subcategory_id=subcategory_id,
+        )
+        self._show_page(route)
+
+    def _navigate_back(self) -> None:
+        context = self.navigation.back()
+        catalog = self.pages.get("home")
+        if context.route == "home" and isinstance(catalog, LearningCatalogPage):
+            if context.subject_id:
+                catalog.show_subject(context.subject_id)
+            else:
+                catalog.show_subjects()
+        self._show_page(context.route)
+
     def _nav_button(self, key: str, label: str) -> None:
         button = tk.Button(
             self.sidebar, text=label, command=lambda: self._show_page(key), anchor="w",
@@ -84,6 +123,11 @@ class MainWindow(tk.Tk):
         self.nav_buttons[key] = button
 
     def _show_page(self, key: str) -> None:
+        if key not in self.pages:
+            key = "home"
+            self.navigation.go_home()
+        elif key == "home" and self.navigation.context.route != "home":
+            self.navigation.go_home()
         for page in self.pages.values():
             page.pack_forget()
         self.pages[key].pack(fill="both", expand=True)
