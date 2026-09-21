@@ -4,6 +4,7 @@ import tkinter as tk
 from collections.abc import Callable
 
 from math_sim.registry import LearningRegistry
+from math_sim.search import RegistrySearch, SearchResult
 from math_sim.ui import theme
 
 
@@ -17,6 +18,28 @@ class LearningCatalogPage(tk.Frame):
         super().__init__(master, bg=theme.BG)
         self.registry = registry
         self.open_route = open_route
+        self.search = RegistrySearch(registry)
+        self.search_var = tk.StringVar()
+        search_bar = tk.Frame(self, bg=theme.BG)
+        search_bar.pack(fill="x", pady=(0, 14))
+        self.search_entry = tk.Entry(
+            search_bar,
+            textvariable=self.search_var,
+            bg=theme.PANEL_ALT,
+            fg=theme.TEXT,
+            insertbackground=theme.TEXT,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=theme.BORDER,
+            highlightcolor=theme.ACCENT,
+            font=(theme.FONT_FAMILY, 11),
+        )
+        self.search_entry.pack(side="left", fill="x", expand=True, ipady=9)
+        self.search_entry.bind("<KeyRelease>", self._on_search_key)
+        self.search_entry.bind("<Return>", self._on_search_enter)
+        self.search_entry.bind("<Escape>", lambda _event: self._clear_search())
+
         self._content = tk.Frame(self, bg=theme.BG)
         self._content.pack(fill="both", expand=True)
         self.show_subjects()
@@ -58,6 +81,82 @@ class LearningCatalogPage(tk.Frame):
             widget.bind("<Return>", lambda _event, fn=command: fn())
         card.configure(takefocus=True)
         return card
+
+
+    def _on_search_key(self, _event=None) -> None:
+        query = self.search_var.get()
+        if query.strip():
+            self.show_search_results(query)
+        else:
+            self.show_subjects()
+
+    def _on_search_enter(self, _event=None) -> None:
+        results = self.search.search(self.search_var.get(), limit=1)
+        if results:
+            self._open_search_result(results[0])
+
+    def _clear_search(self) -> None:
+        self.search_var.set("")
+        self.show_subjects()
+        self.search_entry.focus_set()
+
+    def _open_search_result(self, result: SearchResult) -> None:
+        if result.kind == "demo" and result.route:
+            self.open_route(result.route)
+        elif result.kind == "subject":
+            self.show_subject(result.id)
+        elif result.kind == "subcategory" and result.subject_id:
+            self.show_subject(result.subject_id)
+
+    def show_search_results(self, query: str) -> None:
+        self._clear()
+        results = self.search.search(query)
+        tk.Label(
+            self._content,
+            text=f"検索結果: {query}",
+            bg=theme.BG,
+            fg=theme.TEXT,
+            font=(theme.FONT_FAMILY, 18, "bold"),
+        ).pack(anchor="w")
+        tk.Label(
+            self._content,
+            text=f"{len(results)} 件",
+            bg=theme.BG,
+            fg=theme.MUTED,
+            font=(theme.FONT_FAMILY, 9),
+        ).pack(anchor="w", pady=(3, 12))
+
+        if not results:
+            tk.Label(
+                self._content,
+                text="一致する科目・カテゴリ・デモはありません。",
+                bg=theme.BG,
+                fg=theme.MUTED,
+                font=(theme.FONT_FAMILY, 10),
+            ).pack(anchor="w", pady=12)
+            return
+
+        for result in results:
+            subject_title = ""
+            if result.subject_id:
+                subject_title = self.registry.subject(result.subject_id).title
+            kind_label = {
+                "subject": "科目",
+                "subcategory": "カテゴリ",
+                "demo": "デモ",
+            }.get(result.kind, result.kind)
+            description_parts = [kind_label]
+            if subject_title:
+                description_parts.append(subject_title)
+            if result.description:
+                description_parts.append(result.description)
+            card = self._card(
+                self._content,
+                result.title,
+                " / ".join(description_parts),
+                lambda item=result: self._open_search_result(item),
+            )
+            card.pack(fill="x", pady=5)
 
     def show_subjects(self) -> None:
         self._clear()
