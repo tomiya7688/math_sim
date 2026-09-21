@@ -61,6 +61,20 @@ class ArchitectureCheckTests(unittest.TestCase):
         )
         self.assertEqual([item.rule for item in violations], ["ARCH001"])
 
+    def test_ui_direct_simulation_import_is_rejected(self):
+        violations = self._check(
+            "math_sim.ui.bad_page",
+            "from math_sim.simulations.monte_carlo import integrate_expression\n",
+        )
+        self.assertIn("ARCH007", [item.rule for item in violations])
+
+    def test_ui_direct_subprocess_is_rejected(self):
+        violations = self._check(
+            "math_sim.ui.bad_page",
+            "import subprocess\n",
+        )
+        self.assertIn("ARCH008", [item.rule for item in violations])
+
 
 if __name__ == "__main__":
     unittest.main()
