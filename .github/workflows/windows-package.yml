@@ -1,0 +1,79 @@
+name: Windows Package
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows-package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure native engines
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build native engines
+        run: cmake --build build --config Release --parallel 2
+
+      - name: Run native tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Install PyInstaller
+        run: python -m pip install --disable-pip-version-check pyinstaller
+
+      - name: Build parent app onedir
+        run: >
+          pyinstaller
+          --noconfirm
+          --clean
+          --onedir
+          --name math_sim
+          --paths python
+          python/math_sim/__main__.py
+
+      - name: Collect native engines
+        shell: pwsh
+        run: |
+          $target = "dist/math_sim/engines"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          $candidates = @(
+            "build/engines/Release",
+            "build/engines",
+            "build/Release/engines"
+          )
+          $source = $null
+          foreach ($candidate in $candidates) {
+            if (Test-Path $candidate) {
+              $source = $candidate
+              break
+            }
+          }
+          if (-not $source) {
+            throw "Could not locate built engine directory"
+          }
+          Copy-Item "$source/*.exe" $target -Force
+
+      - name: Validate distribution contents
+        run: python tools/package/validate_dist.py dist/math_sim
+
+      - name: Packaged runtime smoke test
+        run: dist/math_sim/math_sim.exe --smoke-test
+
+      - name: Packaged engine E2E
+        shell: pwsh
+        run: |
+          $mc = & "dist/math_sim/engines/monte_carlo_integral.exe" --expression "4/(1+x**2)" --lower 0 --upper 1 --samples 10000 --seed 1
+          $json = $mc | ConvertFrom-Json
+          if ($json.simulation -ne "monte_carlo_integral") {
+            throw "Unexpected simulation response"
+          }
+          if ([math]::Abs([double]$json.estimate - [math]::PI) -gt 0.05) {
+            throw "Packaged Monte Carlo engine returned an unexpected estimate"
+          }
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: math_sim-windows
+          path: dist/math_sim
