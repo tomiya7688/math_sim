@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(cpp/engines/monte_carlo_pi)
+add_subdirectory(cpp/engines/monte_carlo_integral)
 add_subdirectory(cpp/engines/random_tree)
 add_subdirectory(cpp/engines/perceptron)
 add_subdirectory(cpp/engines/mlp)
