@@ -4,7 +4,7 @@ import unittest
 
 from math_sim.engines.maze import generate_and_solve_maze
 from math_sim.engines.mlp import train_logic_gate as train_mlp
-from math_sim.engines.monte_carlo import estimate_pi
+from math_sim.engines.monte_carlo import estimate_pi, integrate_expression
 from math_sim.engines.pathfinding import solve_random_map
 from math_sim.engines.pathfinding_advanced import solve_advanced_map
 from math_sim.engines.pathfinding_replanning import simulate_replanning
@@ -17,6 +17,11 @@ class NativeEngineE2ETests(unittest.TestCase):
         result = estimate_pi(samples=2_000, seed=1)
         self.assertEqual(result["simulation"], "monte_carlo_pi")
         self.assertEqual(result["samples"], 2_000)
+
+    def test_monte_carlo_expression_subprocess(self):
+        result = integrate_expression("4/(1+x**2)", 0.0, 1.0, samples=20_000, seed=1)
+        self.assertAlmostEqual(result.estimate, 3.14159, delta=0.03)
+        self.assertGreaterEqual(result.standard_error, 0.0)
 
     def test_random_tree_subprocess(self):
         result = generate_tree(depth=3, seed=1)
