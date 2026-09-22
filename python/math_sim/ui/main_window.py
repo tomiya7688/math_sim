@@ -6,7 +6,7 @@ import tkinter as tk
 from math_sim.catalog import REGISTRY
 from math_sim.engines.random_tree import generate_tree as generate_native_tree
 from math_sim.navigation import NavigationModel
-from math_sim.simulations.monte_carlo import integrate_expression
+from math_sim.engines.monte_carlo import integrate_expression
 from math_sim.ui import theme
 from math_sim.ui.catalog_page import LearningCatalogPage
 from math_sim.ui.maze_generator_race_page import build_maze_generator_race_page
