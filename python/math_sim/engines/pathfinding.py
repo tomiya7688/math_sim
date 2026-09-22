@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
-import subprocess
-import sys
-from pathlib import Path
 from typing import Any
+
+from math_sim.runtime import EngineProcess
 
 
 ALGORITHMS = (
@@ -23,28 +21,7 @@ ALGORITHMS = (
     "fringe",
 )
 
-
-def _engine_name() -> str:
-    return "pathfinding.exe" if sys.platform.startswith("win") else "pathfinding"
-
-
-def resolve_engine_path() -> Path:
-    executable_dir = Path(sys.executable).resolve().parent
-    packaged = executable_dir / "engines" / _engine_name()
-    if packaged.exists():
-        return packaged
-
-    repo_root = Path(__file__).resolve().parents[3]
-    for candidate in (
-        repo_root / "build" / "engines" / _engine_name(),
-        repo_root / "build" / _engine_name(),
-    ):
-        if candidate.exists():
-            return candidate
-
-    raise FileNotFoundError(
-        "Pathfinding engine was not found. Build it into build/engines/ or package it beside the parent app."
-    )
+_ENGINE = EngineProcess("pathfinding")
 
 
 def solve_random_map(
@@ -61,8 +38,7 @@ def solve_random_map(
     if algorithm not in ALGORITHMS:
         raise ValueError(f"algorithm must be one of: {', '.join(ALGORITHMS)}")
 
-    command = [
-        str(resolve_engine_path()),
+    return _ENGINE.run_json([
         "--width", str(width),
         "--height", str(height),
         "--obstacles", str(obstacle_probability),
@@ -70,12 +46,4 @@ def solve_random_map(
         "--max-cost", str(max_cost),
         "--seed", str(seed),
         "--algorithm", algorithm,
-    ]
-    completed = subprocess.run(
-        command,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    return json.loads(completed.stdout)
+    ])
