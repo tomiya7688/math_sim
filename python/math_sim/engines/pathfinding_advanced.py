@@ -1,37 +1,14 @@
 from __future__ import annotations
 
-import json
-import subprocess
-import sys
-from pathlib import Path
 from typing import Any
+
+from math_sim.runtime import EngineProcess
 
 
 ALGORITHMS = ("dijkstra", "astar", "zero_one_bfs", "dial", "jps")
 COST_PROFILES = ("continuous", "integer", "zero_one")
 
-
-def _engine_name() -> str:
-    return "pathfinding_advanced.exe" if sys.platform.startswith("win") else "pathfinding_advanced"
-
-
-def resolve_engine_path() -> Path:
-    executable_dir = Path(sys.executable).resolve().parent
-    packaged = executable_dir / "engines" / _engine_name()
-    if packaged.exists():
-        return packaged
-
-    repo_root = Path(__file__).resolve().parents[3]
-    for candidate in (
-        repo_root / "build" / "engines" / _engine_name(),
-        repo_root / "build" / _engine_name(),
-    ):
-        if candidate.exists():
-            return candidate
-
-    raise FileNotFoundError(
-        "Advanced pathfinding engine was not found. Build it into build/engines/ or package it beside the parent app."
-    )
+_ENGINE = EngineProcess("pathfinding_advanced")
 
 
 def solve_advanced_map(
@@ -74,8 +51,7 @@ def solve_advanced_map(
         if cost_profile == "zero_one":
             raise ValueError("jps requires a positive uniform cost profile")
 
-    command = [
-        str(resolve_engine_path()),
+    return _ENGINE.run_json([
         "--width", str(width),
         "--height", str(height),
         "--obstacles", str(obstacle_probability),
@@ -91,12 +67,4 @@ def solve_advanced_map(
         "--diagonal", "1" if diagonal else "0",
         "--dynamic-costs", "1" if dynamic_costs else "0",
         "--start-time", str(start_time),
-    ]
-    completed = subprocess.run(
-        command,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    return json.loads(completed.stdout)
+    ])
