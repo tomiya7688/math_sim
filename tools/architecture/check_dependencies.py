@@ -100,6 +100,16 @@ def check_file(path: Path) -> list[Violation]:
 
     if mod.startswith("math_sim.engines"):
         reject(("math_sim.ui",), "ARCH004", "engine adapters must not depend on UI")
+        for line, imported in imports:
+            if imported == "subprocess" or imported.startswith("subprocess."):
+                violations.append(
+                    Violation(
+                        path,
+                        line,
+                        "ARCH009",
+                        f"{mod}: engine adapters must use math_sim.runtime.EngineProcess instead of subprocess directly",
+                    )
+                )
 
     if mod.startswith("math_sim.upd.contracts"):
         reject(("math_sim.upd.ui", "math_sim.upd.process"),
