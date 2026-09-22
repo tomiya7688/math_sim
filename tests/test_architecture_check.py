@@ -75,6 +75,13 @@ class ArchitectureCheckTests(unittest.TestCase):
         )
         self.assertIn("ARCH008", [item.rule for item in violations])
 
+    def test_engine_adapter_direct_subprocess_is_rejected(self):
+        violations = self._check(
+            "math_sim.engines.bad_adapter",
+            "import subprocess\n",
+        )
+        self.assertIn("ARCH009", [item.rule for item in violations])
+
 
 if __name__ == "__main__":
     unittest.main()
