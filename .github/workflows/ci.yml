@@ -30,6 +30,7 @@ jobs:
           python -m unittest discover -s tests -p "test_architecture_check.py"
           python -m unittest discover -s tests -p "test_navigation.py"
           python -m unittest discover -s tests -p "test_application_services.py"
+          python -m unittest discover -s tests -p "test_maze_state.py"
       - name: Native engine E2E
         env:
           PYTHONPATH: python
