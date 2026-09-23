@@ -4,11 +4,16 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 
-from math_sim.engines.mlp import train_logic_gate
+from math_sim.application import MlpService
 from math_sim.ui import theme
 
 
-def build_mlp_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
+def build_mlp_page(
+    app: tk.Misc,
+    parent: tk.Widget,
+    service: MlpService | None = None,
+) -> tk.Frame:
+    service = service or MlpService()
     page = tk.Frame(parent, bg=theme.BG)
 
     controls = tk.Frame(page, bg=theme.PANEL, width=320, highlightthickness=1, highlightbackground=theme.BORDER)
@@ -141,7 +146,7 @@ def build_mlp_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
 
     def worker(gate: str, hidden: int, lr: float, epochs: int, seed: int) -> None:
         try:
-            result = train_logic_gate(gate, hidden, lr, epochs, seed)
+            result = service.train(gate, hidden, lr, epochs, seed)
             app.after(0, show_result, result)
         except Exception as exc:
             app.after(0, show_error, str(exc))
