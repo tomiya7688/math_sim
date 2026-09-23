@@ -30,9 +30,12 @@ NORTH, EAST, SOUTH, WEST = 1, 2, 4, 8
 PLAYBACK_SPEEDS = (0.25, 0.5, 1.0, 2.0, 4.0)
 
 
-def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
-    commander = MazeUiCommander()
-    page = tk.Frame(parent, bg=theme.BG)
+def _populate_maze_page(
+    app: tk.Misc,
+    page: tk.Frame,
+    commander: MazeUiCommander,
+    state: MazePageState,
+) -> None:
     controls = tk.Frame(page, bg=theme.PANEL, width=315, highlightthickness=1, highlightbackground=theme.BORDER)
     controls.pack(side="left", fill="y", padx=(0, 14)); controls.pack_propagate(False)
     inner = tk.Frame(controls, bg=theme.PANEL); inner.pack(fill="both", expand=True, padx=20, pady=20)
@@ -102,8 +105,6 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
              font=(theme.FONT_FAMILY,9),highlightthickness=1,highlightbackground=theme.BORDER).pack(fill="x",pady=(0,6))
     tk.Label(metrics,textvariable=compare_var,bg=theme.PANEL_ALT,fg=theme.TEXT,anchor="w",justify="left",padx=12,pady=8,
              font=("Consolas",9),highlightthickness=1,highlightbackground=theme.BORDER).pack(fill="x")
-
-    state = MazePageState()
 
     def params() -> dict:
         w,h,s=int(width_var.get()),int(height_var.get()),int(seed_var.get())
@@ -337,4 +338,25 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
     generate_btn.configure(command=generate);generation_replay_btn.configure(command=start_generation_replay);compare_btn.configure(command=compare);race_btn.configure(command=start_race);play_btn.configure(command=start_play);hint_btn.configure(command=hint)
     reset_btn.configure(command=reset_replay);play_replay_btn.configure(command=start_replay);pause_btn.configure(command=pause_replay);step_btn.configure(command=step_replay);slower_btn.configure(command=lambda:change_speed(-1));faster_btn.configure(command=lambda:change_speed(1))
     solution_var.trace_add("write",lambda *_:draw());canvas.bind("<KeyPress>",key);canvas.bind("<Button-1>",lambda _e:canvas.focus_set());canvas.bind("<Configure>",lambda _e:draw())
-    return page
+
+
+
+class MazePage(tk.Frame):
+    def __init__(
+        self,
+        parent: tk.Widget,
+        commander: MazeUiCommander | None = None,
+        state: MazePageState | None = None,
+    ) -> None:
+        super().__init__(parent, bg=theme.BG)
+        self.commander = commander or MazeUiCommander()
+        self.state = state or MazePageState()
+        _populate_maze_page(self, self, self.commander, self.state)
+
+
+def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
+    del app
+    return MazePage(parent)
+
+
+__all__ = ["MazePage", "build_maze_page"]
