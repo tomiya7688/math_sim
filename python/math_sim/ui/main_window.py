@@ -8,10 +8,10 @@ from math_sim.ui import theme
 from math_sim.ui.catalog_page import LearningCatalogPage
 from math_sim.ui.maze_generator_race_page import build_maze_generator_race_page
 from math_sim.ui.maze_page import build_maze_page
-from math_sim.ui.mlp_page import build_mlp_page
+from math_sim.ui.mlp_page import MlpPage
 from math_sim.ui.monte_carlo_page import MonteCarloPage
 from math_sim.ui.pathfinding_page import build_pathfinding_page
-from math_sim.ui.perceptron_page import build_perceptron_page
+from math_sim.ui.perceptron_page import PerceptronPage
 from math_sim.ui.random_tree_page import RandomTreePage
 
 
@@ -112,13 +112,11 @@ class MainWindow(tk.Tk):
                 self.page_host,
                 self.services.random_tree,
             ),
-            "perceptron": build_perceptron_page(
-                self,
+            "perceptron": PerceptronPage(
                 self.page_host,
                 self.services.perceptron,
             ),
-            "mlp": build_mlp_page(
-                self,
+            "mlp": MlpPage(
                 self.page_host,
                 self.services.mlp,
             ),
