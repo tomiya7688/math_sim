@@ -4,11 +4,16 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 
-from math_sim.engines.perceptron import train_logic_gate
+from math_sim.application import PerceptronService
 from math_sim.ui import theme
 
 
-def build_perceptron_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
+def build_perceptron_page(
+    app: tk.Misc,
+    parent: tk.Widget,
+    service: PerceptronService | None = None,
+) -> tk.Frame:
+    service = service or PerceptronService()
     page = tk.Frame(parent, bg=theme.BG)
 
     controls = tk.Frame(page, bg=theme.PANEL, width=310, highlightthickness=1, highlightbackground=theme.BORDER)
@@ -156,7 +161,7 @@ def build_perceptron_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
 
     def worker(gate: str, lr: float, epochs: int) -> None:
         try:
-            result = train_logic_gate(gate=gate, learning_rate=lr, epochs=epochs)
+            result = service.train(gate=gate, learning_rate=lr, epochs=epochs)
             app.after(0, show_result, result)
         except Exception as exc:
             app.after(0, show_error, str(exc))
