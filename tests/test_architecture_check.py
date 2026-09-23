@@ -89,6 +89,27 @@ class ArchitectureCheckTests(unittest.TestCase):
         )
         self.assertIn("ARCH010", [item.rule for item in violations])
 
+    def test_application_importing_ui_is_rejected(self):
+        violations = self._check(
+            "math_sim.application.bad_service",
+            "from math_sim.ui import theme\n",
+        )
+        self.assertIn("ARCH011", [item.rule for item in violations])
+
+    def test_application_importing_tkinter_is_rejected(self):
+        violations = self._check(
+            "math_sim.application.bad_service",
+            "import tkinter\n",
+        )
+        self.assertIn("ARCH012", [item.rule for item in violations])
+
+    def test_application_direct_subprocess_is_rejected(self):
+        violations = self._check(
+            "math_sim.application.bad_service",
+            "import subprocess\n",
+        )
+        self.assertIn("ARCH013", [item.rule for item in violations])
+
 
 if __name__ == "__main__":
     unittest.main()
