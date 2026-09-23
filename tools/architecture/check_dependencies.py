@@ -31,8 +31,12 @@ def module_name(path: Path) -> str:
     return ".".join(relative.parts)
 
 
+def parse_tree(path: Path) -> ast.AST:
+    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+
 def imported_modules(path: Path) -> list[tuple[int, str]]:
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    tree = parse_tree(path)
     modules: list[tuple[int, str]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -60,6 +64,36 @@ def check_file(path: Path) -> list[Violation]:
     violations: list[Violation] = []
 
     if mod.startswith("math_sim.ui"):
+        tree = parse_tree(path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                if any(
+                    isinstance(target, ast.Name) and target.id == "state"
+                    for target in node.targets
+                ) and isinstance(node.value, ast.Dict):
+                    violations.append(
+                        Violation(
+                            path,
+                            node.lineno,
+                            "ARCH014",
+                            f"{mod}: UI page state must be owned by an object, not an anonymous state dict",
+                        )
+                    )
+            elif isinstance(node, ast.AnnAssign):
+                if (
+                    isinstance(node.target, ast.Name)
+                    and node.target.id == "state"
+                    and isinstance(node.value, ast.Dict)
+                ):
+                    violations.append(
+                        Violation(
+                            path,
+                            node.lineno,
+                            "ARCH014",
+                            f"{mod}: UI page state must be owned by an object, not an anonymous state dict",
+                        )
+                    )
+
         for line, imported in imports:
             if imported.startswith("math_sim.engines"):
                 violations.append(
