@@ -5,7 +5,6 @@ import tkinter as tk
 
 from math_sim.application import ApplicationServices
 from math_sim.catalog import REGISTRY
-from math_sim.navigation import NavigationModel
 from math_sim.ui import theme
 from math_sim.ui.catalog_page import LearningCatalogPage
 from math_sim.ui.maze_generator_race_page import build_maze_generator_race_page
@@ -16,15 +15,15 @@ from math_sim.ui.perceptron_page import build_perceptron_page
 
 
 class MainWindow(tk.Tk):
-    def __init__(self) -> None:
+    def __init__(self, services: ApplicationServices | None = None) -> None:
         super().__init__()
         self.title("Math Sim")
         self.geometry("1180x720")
         self.minsize(980, 620)
         self.configure(bg=theme.BG)
         self._tree_segments: list[list[float]] = []
-        self.services = ApplicationServices.default()
-        self.navigation = NavigationModel()
+        self.services = services or ApplicationServices.default()
+        self.navigation = self.services.navigation
         self._build_layout()
         self._show_page("home")
 
