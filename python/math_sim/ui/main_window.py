@@ -7,7 +7,7 @@ from math_sim.catalog import REGISTRY
 from math_sim.ui import theme
 from math_sim.ui.catalog_page import LearningCatalogPage
 from math_sim.ui.maze_generator_race_page import MazeGeneratorRacePage
-from math_sim.ui.maze_page import build_maze_page
+from math_sim.ui.maze_page import MazePage
 from math_sim.ui.mlp_page import MlpPage
 from math_sim.ui.monte_carlo_page import MonteCarloPage
 from math_sim.ui.pathfinding_page import PathfindingRouterPage
@@ -121,7 +121,7 @@ class MainWindow(tk.Tk):
                 self.services.mlp,
             ),
             "pathfinding": PathfindingRouterPage(self, self.page_host),
-            "maze": build_maze_page(self, self.page_host),
+            "maze": MazePage(self.page_host),
             "maze_generator_race": MazeGeneratorRacePage(
                 self.page_host,
             ),
