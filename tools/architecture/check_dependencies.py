@@ -108,6 +108,28 @@ def check_file(path: Path) -> list[Violation]:
     if mod.startswith("math_sim.simulations"):
         reject(("math_sim.ui",), "ARCH003", "simulation/domain code must not depend on UI")
 
+    if mod.startswith("math_sim.application"):
+        reject(("math_sim.ui",), "ARCH011", "application layer must not depend on UI")
+        for line, imported in imports:
+            if imported == "tkinter" or imported.startswith("tkinter."):
+                violations.append(
+                    Violation(
+                        path,
+                        line,
+                        "ARCH012",
+                        f"{mod}: application layer must remain GUI-framework independent",
+                    )
+                )
+            if imported == "subprocess" or imported.startswith("subprocess."):
+                violations.append(
+                    Violation(
+                        path,
+                        line,
+                        "ARCH013",
+                        f"{mod}: application layer must use engine adapters instead of subprocess directly",
+                    )
+                )
+
     if mod.startswith("math_sim.engines"):
         reject(("math_sim.ui",), "ARCH004", "engine adapters must not depend on UI")
         for line, imported in imports:
