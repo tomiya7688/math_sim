@@ -110,6 +110,13 @@ class ArchitectureCheckTests(unittest.TestCase):
         )
         self.assertIn("ARCH013", [item.rule for item in violations])
 
+    def test_ui_anonymous_state_dict_is_rejected(self):
+        violations = self._check(
+            "math_sim.ui.bad_page",
+            "state: dict[str, object] = {}\n",
+        )
+        self.assertIn("ARCH014", [item.rule for item in violations])
+
 
 if __name__ == "__main__":
     unittest.main()
