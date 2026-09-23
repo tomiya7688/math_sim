@@ -3,10 +3,9 @@ from __future__ import annotations
 import threading
 import tkinter as tk
 
+from math_sim.application import ApplicationServices
 from math_sim.catalog import REGISTRY
-from math_sim.engines.random_tree import generate_tree as generate_native_tree
 from math_sim.navigation import NavigationModel
-from math_sim.engines.monte_carlo import integrate_expression
 from math_sim.ui import theme
 from math_sim.ui.catalog_page import LearningCatalogPage
 from math_sim.ui.maze_generator_race_page import build_maze_generator_race_page
@@ -24,6 +23,7 @@ class MainWindow(tk.Tk):
         self.minsize(980, 620)
         self.configure(bg=theme.BG)
         self._tree_segments: list[list[float]] = []
+        self.services = ApplicationServices.default()
         self.navigation = NavigationModel()
         self._build_layout()
         self._show_page("home")
@@ -84,8 +84,8 @@ class MainWindow(tk.Tk):
             "home": LearningCatalogPage(self.page_host, REGISTRY, self._open_demo),
             "monte_carlo": self._build_monte_carlo_page(),
             "random_tree": self._build_random_tree_page(),
-            "perceptron": build_perceptron_page(self, self.page_host),
-            "mlp": build_mlp_page(self, self.page_host),
+            "perceptron": build_perceptron_page(self, self.page_host, self.services.perceptron),
+            "mlp": build_mlp_page(self, self.page_host, self.services.mlp),
             "pathfinding": build_pathfinding_page(self, self.page_host),
             "maze": build_maze_page(self, self.page_host),
             "maze_generator_race": build_maze_generator_race_page(self, self.page_host),
@@ -244,7 +244,7 @@ class MainWindow(tk.Tk):
     def _monte_carlo_worker(self, expression: str, lower: float, upper: float,
                             samples: int, seed: int | None) -> None:
         try:
-            result = integrate_expression(expression, lower, upper, samples, seed)
+            result = self.services.monte_carlo.integrate(expression, lower, upper, samples, seed)
             self.after(0, self._show_monte_carlo_result, result)
         except Exception as exc:
             self.after(0, self._monte_carlo_error, str(exc))
@@ -332,9 +332,14 @@ class MainWindow(tk.Tk):
     def _random_tree_worker(self, depth: int, seed: int | None, branch_angle: float,
                             angle_jitter: float, length_decay: float, length_jitter: float) -> None:
         try:
-            result = generate_native_tree(depth=depth, seed=seed, branch_angle=branch_angle,
-                                          angle_jitter=angle_jitter, length_decay=length_decay,
-                                          length_jitter=length_jitter)
+            result = self.services.random_tree.generate(
+                depth=depth,
+                seed=seed,
+                branch_angle=branch_angle,
+                angle_jitter=angle_jitter,
+                length_decay=length_decay,
+                length_jitter=length_jitter,
+            )
             self.after(0, self._show_random_tree_result, result)
         except Exception as exc:
             self.after(0, self._random_tree_error, str(exc))
