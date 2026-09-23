@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 import tkinter as tk
 
-from math_sim.engines.maze import GENERATORS
+from math_sim.application.maze_catalog import GENERATORS
 from math_sim.ui import theme
 from math_sim.upd.ui.maze.commander import MazeUiCommander
 
