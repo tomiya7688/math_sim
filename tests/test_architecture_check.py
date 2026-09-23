@@ -82,6 +82,13 @@ class ArchitectureCheckTests(unittest.TestCase):
         )
         self.assertIn("ARCH009", [item.rule for item in violations])
 
+    def test_ui_direct_engine_adapter_import_is_rejected(self):
+        violations = self._check(
+            "math_sim.ui.bad_page",
+            "from math_sim.engines.mlp import train_logic_gate\n",
+        )
+        self.assertIn("ARCH010", [item.rule for item in violations])
+
 
 if __name__ == "__main__":
     unittest.main()
