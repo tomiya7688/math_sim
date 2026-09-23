@@ -60,6 +60,16 @@ def check_file(path: Path) -> list[Violation]:
     violations: list[Violation] = []
 
     if mod.startswith("math_sim.ui"):
+        for line, imported in imports:
+            if imported.startswith("math_sim.engines"):
+                violations.append(
+                    Violation(
+                        path,
+                        line,
+                        "ARCH010",
+                        f"{mod}: UI must depend on application/process services, not engine adapters directly: {imported}",
+                    )
+                )
         baseline = load_parent_process_baseline()
         for line, imported in imports:
             if imported.startswith("math_sim.simulations"):
