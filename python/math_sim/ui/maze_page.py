@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from math_sim.ui import theme
+from math_sim.ui.maze_state import MazePageState
 from math_sim.upd.ui.maze.commander import MazeUiCommander
 
 GENERATOR_LABELS = {
@@ -102,11 +103,7 @@ def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
     tk.Label(metrics,textvariable=compare_var,bg=theme.PANEL_ALT,fg=theme.TEXT,anchor="w",justify="left",padx=12,pady=8,
              font=("Consolas",9),highlightthickness=1,highlightbackground=theme.BORDER).pack(fill="x")
 
-    state: dict[str, object] = {
-        "result": None, "race_results": [], "mode": "search", "player": (0,0), "playing": False,
-        "moves":0, "backtracks":0, "visited_cells":{(0,0)}, "start_time":None, "elapsed":0.0, "hint":None,
-        "replay_frame":0, "replaying":False, "replay_speed":1.0, "replay_job":None,
-    }
+    state = MazePageState()
 
     def params() -> dict:
         w,h,s=int(width_var.get()),int(height_var.get()),int(seed_var.get())
