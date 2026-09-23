@@ -3,7 +3,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from math_sim.ui.replanning_page import build_replanning_page
+from math_sim.ui.replanning_page import ReplanningPage
 from math_sim.upd.ui.pathfinding.processing import PathfindingPage
 
 
@@ -20,7 +20,7 @@ class PathfindingRouterPage(tk.Frame):
         notebook.add(dynamic_host, text="Dynamic Replanning")
 
         PathfindingPage(standard_host).pack(fill="both", expand=True)
-        build_replanning_page(app, dynamic_host).pack(fill="both", expand=True)
+        ReplanningPage(dynamic_host).pack(fill="both", expand=True)
 
 
 def build_pathfinding_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
