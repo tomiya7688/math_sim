@@ -60,17 +60,8 @@ jobs:
       - name: Packaged runtime smoke test
         run: dist/math_sim/math_sim.exe --smoke-test
 
-      - name: Packaged engine E2E
-        shell: pwsh
-        run: |
-          $mc = & "dist/math_sim/engines/monte_carlo_integral.exe" --expression "4/(1+x**2)" --lower 0 --upper 1 --samples 10000 --seed 1
-          $json = $mc | ConvertFrom-Json
-          if ($json.simulation -ne "monte_carlo_integral") {
-            throw "Unexpected simulation response"
-          }
-          if ([math]::Abs([double]$json.estimate - [math]::PI) -gt 0.05) {
-            throw "Packaged Monte Carlo engine returned an unexpected estimate"
-          }
+      - name: Packaged parent-to-engine E2E
+        run: dist/math_sim/math_sim.exe --engine-e2e
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
