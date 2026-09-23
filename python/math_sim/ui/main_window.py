@@ -10,7 +10,7 @@ from math_sim.ui.maze_generator_race_page import build_maze_generator_race_page
 from math_sim.ui.maze_page import build_maze_page
 from math_sim.ui.mlp_page import MlpPage
 from math_sim.ui.monte_carlo_page import MonteCarloPage
-from math_sim.ui.pathfinding_page import build_pathfinding_page
+from math_sim.ui.pathfinding_page import PathfindingRouterPage
 from math_sim.ui.perceptron_page import PerceptronPage
 from math_sim.ui.random_tree_page import RandomTreePage
 
@@ -120,7 +120,7 @@ class MainWindow(tk.Tk):
                 self.page_host,
                 self.services.mlp,
             ),
-            "pathfinding": build_pathfinding_page(self, self.page_host),
+            "pathfinding": PathfindingRouterPage(self, self.page_host),
             "maze": build_maze_page(self, self.page_host),
             "maze_generator_race": build_maze_generator_race_page(
                 self,
