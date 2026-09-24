@@ -1,6 +1,6 @@
 import unittest
 
-from math_sim.ui.maze_state import MazePageState
+from math_sim.application import MazePageState
 
 
 class MazePageStateTests(unittest.TestCase):
