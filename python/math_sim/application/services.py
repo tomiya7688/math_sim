@@ -3,11 +3,58 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from math_sim.engines.maze import generate_and_solve_maze
 from math_sim.engines.mlp import train_logic_gate as train_mlp
 from math_sim.engines.monte_carlo import MonteCarloIntegralResult, integrate_expression
 from math_sim.engines.perceptron import train_logic_gate as train_perceptron
 from math_sim.engines.random_tree import generate_tree
 from math_sim.navigation import NavigationModel
+
+
+class MazeSimulationService:
+    def __init__(
+        self,
+        runner: Callable[..., dict[str, Any]] = generate_and_solve_maze,
+    ) -> None:
+        self._runner = runner
+
+    def generate(self, **params: Any) -> dict[str, Any]:
+        return self._runner(**params)
+
+    def compare_solvers(
+        self,
+        base: dict[str, Any],
+        solvers: dict[str, str],
+    ) -> list[tuple[str, dict[str, Any]]]:
+        rows: list[tuple[str, dict[str, Any]]] = []
+        for label, solver in solvers.items():
+            params = dict(base)
+            params["solver"] = solver
+            rows.append((label, self._runner(**params)))
+        return rows
+
+    def compare_generators(
+        self,
+        *,
+        width: int,
+        height: int,
+        seed: int,
+        generators: tuple[str, ...],
+        solver: str = "bfs",
+    ) -> list[tuple[str, dict[str, Any]]]:
+        return [
+            (
+                generator,
+                self._runner(
+                    width=width,
+                    height=height,
+                    seed=seed,
+                    generator=generator,
+                    solver=solver,
+                ),
+            )
+            for generator in generators
+        ]
 
 
 class MonteCarloService:
@@ -102,6 +149,7 @@ class MlpService:
 @dataclass(frozen=True)
 class ApplicationServices:
     navigation: NavigationModel
+    maze: MazeSimulationService
     monte_carlo: MonteCarloService
     random_tree: RandomTreeService
     perceptron: PerceptronService
@@ -111,6 +159,7 @@ class ApplicationServices:
     def default(cls) -> "ApplicationServices":
         return cls(
             navigation=NavigationModel(),
+            maze=MazeSimulationService(),
             monte_carlo=MonteCarloService(),
             random_tree=RandomTreeService(),
             perceptron=PerceptronService(),
