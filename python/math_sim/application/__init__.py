@@ -10,6 +10,7 @@ from .maze import (
 )
 from .services import (
     ApplicationServices,
+    MazeSimulationService,
     MlpService,
     MonteCarloService,
     PerceptronService,
@@ -24,6 +25,7 @@ __all__ = [
     "MazePlaySessionController",
     "MazeRaceController",
     "ApplicationServices",
+    "MazeSimulationService",
     "MlpService",
     "MonteCarloService",
     "PerceptronService",
