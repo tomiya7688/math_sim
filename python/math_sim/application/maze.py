@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Iterable
 
 
@@ -227,49 +228,22 @@ class MazePageState:
         self._replay_job = None
 
 
+@dataclass(frozen=True, slots=True)
 class MazePlayMetrics:
-    __slots__ = (
-        "moves",
-        "elapsed",
-        "optimal_steps",
-        "extra_steps",
-        "loss_percent",
-        "efficiency_percent",
-        "backtracks",
-    )
-
-    def __init__(
-        self,
-        *,
-        moves: int,
-        elapsed: float,
-        optimal_steps: int,
-        extra_steps: int,
-        loss_percent: float,
-        efficiency_percent: float,
-        backtracks: int,
-    ) -> None:
-        self.moves = moves
-        self.elapsed = elapsed
-        self.optimal_steps = optimal_steps
-        self.extra_steps = extra_steps
-        self.loss_percent = loss_percent
-        self.efficiency_percent = efficiency_percent
-        self.backtracks = backtracks
+    moves: int
+    elapsed: float
+    optimal_steps: int
+    extra_steps: int
+    loss_percent: float
+    efficiency_percent: float
+    backtracks: int
 
 
+@dataclass(frozen=True, slots=True)
 class MazeMoveResult:
-    __slots__ = ("moved", "finished", "position")
-
-    def __init__(
-        self,
-        moved: bool,
-        finished: bool,
-        position: tuple[int, int],
-    ) -> None:
-        self.moved = moved
-        self.finished = finished
-        self.position = position
+    moved: bool
+    finished: bool
+    position: tuple[int, int]
 
 
 class MazePlaybackController:
