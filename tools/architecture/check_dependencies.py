@@ -144,6 +144,28 @@ def check_file(path: Path) -> list[Violation]:
 
     if mod.startswith("math_sim.application"):
         reject(("math_sim.ui",), "ARCH011", "application layer must not depend on UI")
+        tree = parse_tree(path)
+        for node in ast.walk(tree):
+            targets: list[ast.expr] = []
+            if isinstance(node, ast.Assign):
+                targets = list(node.targets)
+            elif isinstance(node, ast.AnnAssign):
+                targets = [node.target]
+            for target in targets:
+                if (
+                    isinstance(target, ast.Attribute)
+                    and isinstance(target.value, ast.Name)
+                    and target.value.id == "self"
+                    and not target.attr.startswith("_")
+                ):
+                    violations.append(
+                        Violation(
+                            path,
+                            node.lineno,
+                            "ARCH015",
+                            f"{mod}: application object mutable state must be private: self.{target.attr}",
+                        )
+                    )
         for line, imported in imports:
             if imported == "tkinter" or imported.startswith("tkinter."):
                 violations.append(
