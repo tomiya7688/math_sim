@@ -117,6 +117,20 @@ class ArchitectureCheckTests(unittest.TestCase):
         )
         self.assertIn("ARCH014", [item.rule for item in violations])
 
+    def test_application_public_mutable_field_is_rejected(self):
+        violations = self._check(
+            "math_sim.application.bad_state",
+            "class Bad:\n    def __init__(self):\n        self.value = 1\n",
+        )
+        self.assertIn("ARCH015", [item.rule for item in violations])
+
+    def test_application_private_mutable_field_is_allowed(self):
+        violations = self._check(
+            "math_sim.application.good_state",
+            "class Good:\n    def __init__(self):\n        self._value = 1\n",
+        )
+        self.assertNotIn("ARCH015", [item.rule for item in violations])
+
 
 if __name__ == "__main__":
     unittest.main()
