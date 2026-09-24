@@ -7,10 +7,10 @@ class MazePageStateTests(unittest.TestCase):
     def test_defaults_are_isolated(self):
         first = MazePageState()
         second = MazePageState()
-        first.visited_cells.add((1, 1))
-        first.race_results.append(("A", {}))
+        first.record_move((1, 1))
+        first.load_race([("A", {})])
         self.assertNotIn((1, 1), second.visited_cells)
-        self.assertEqual(second.race_results, [])
+        self.assertEqual(second.race_results, ())
 
     def test_state_is_read_only_from_callers(self):
         state = MazePageState(moves=3)
