@@ -3,9 +3,9 @@ from __future__ import annotations
 import threading
 import tkinter as tk
 
+from math_sim.application import MazeSimulationService
 from math_sim.application.maze_catalog import GENERATORS
 from math_sim.ui import theme
-from math_sim.upd.ui.maze.commander import MazeUiCommander
 
 
 GENERATOR_LABELS = {
@@ -27,10 +27,10 @@ class MazeGeneratorRacePage(tk.Frame):
     def __init__(
         self,
         parent: tk.Widget,
-        commander: MazeUiCommander | None = None,
+        service: MazeSimulationService | None = None,
     ) -> None:
         super().__init__(parent, bg=theme.BG)
-        self._commander = commander or MazeUiCommander()
+        self._service = service or MazeSimulationService()
         self._rows: list[tuple[str, dict]] = []
         self._frame = 0
         self._playing = False
@@ -467,18 +467,16 @@ class MazeGeneratorRacePage(tk.Frame):
 
     def _worker(self, width: int, height: int, seed: int) -> None:
         try:
-            rows: list[tuple[str, dict]] = []
-            for generator in GENERATORS:
-                result = self._commander.generate(
+            rows = [
+                (GENERATOR_LABELS.get(generator, generator), result)
+                for generator, result in self._service.compare_generators(
                     width=width,
                     height=height,
                     seed=seed,
-                    generator=generator,
+                    generators=tuple(GENERATORS),
                     solver="bfs",
                 )
-                rows.append(
-                    (GENERATOR_LABELS.get(generator, generator), result)
-                )
+            ]
             self.after(0, self._finish, rows)
         except Exception as exc:
             self.after(0, self._fail, str(exc))
