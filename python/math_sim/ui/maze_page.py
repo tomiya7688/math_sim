@@ -121,7 +121,7 @@ def _populate_maze_page(
 
     def center(x:int,y:int,cw:float,ch:float)->tuple[float,float]: return (x+.5)*cw,(y+.5)*ch
     def race_rows()->list[tuple[str,dict]]:
-        rows=state.get("race_results"); return rows if isinstance(rows,list) else []
+        return list(state.race_results)
     def search_trace()->list:
         return playback_logic.search_trace()
     def generation_trace()->list:
@@ -198,7 +198,7 @@ def _populate_maze_page(
         if job is not None:
             try:app.after_cancel(job)
             except Exception:pass
-        state["replay_job"]=None
+        state.clear_replay_job()
     def pause_replay()->None:
         playback_logic.pause()
         cancel_job()
@@ -209,7 +209,7 @@ def _populate_maze_page(
         if not playback_logic.advance():
             draw(); status_var.set("Replay finished."); return
         draw(); speed=max(float(state.get("replay_speed",1.0)),.01)
-        state["replay_job"]=app.after(max(10,int(120/speed)),replay_tick)
+        state.set_replay_job(app.after(max(10,int(120/speed)),replay_tick))
     def start_replay()->None:
         if not playback_logic.start():
             status_var.set("No replay trace is available.");return
@@ -221,7 +221,7 @@ def _populate_maze_page(
     def change_speed(d:int)->None:
         speed=playback_logic.change_speed(d)
         if state.get("replaying"):
-            cancel_job(); state["replay_job"]=app.after(max(10,int(120/speed)),replay_tick)
+            cancel_job(); state.set_replay_job(app.after(max(10,int(120/speed)),replay_tick))
         update_replay_status()
 
     def update_play_metrics()->None:
@@ -241,7 +241,7 @@ def _populate_maze_page(
 
     all_buttons=lambda:(generate_btn,generation_replay_btn,compare_btn,race_btn,play_btn)
     def finish(r:dict)->None:
-        pause_replay(); state.update({"result":r,"race_results":[],"mode":"search","player":(0,0),"playing":False,"moves":0,"backtracks":0,"visited_cells":{(0,0)},"elapsed":0.0,"hint":None,"replay_frame":0})
+        pause_replay(); state.load_result(r)
         summary_var.set(f"{r.get('generator','')} · {r.get('solver','')} · steps {int(r.get('steps',0))} · loss +{int(r.get('extra_steps',0))} ({float(r.get('loss_percent',0)):.1f}%) · calculations {int(r.get('calculation_count',0))}")
         compare_var.set(""); status_var.set("Maze generated. Replay construction/search or press PLAY.")
         for b in all_buttons():b.configure(state="normal")
@@ -255,14 +255,14 @@ def _populate_maze_page(
     def generate()->None:
         try:p=params()
         except Exception as e:status_var.set(str(e));return
-        pause_replay();state["playing"]=False
+        pause_replay();state.finish_play()
         for b in all_buttons():b.configure(state="disabled")
         status_var.set("Generating maze with native C++ engine…");threading.Thread(target=worker,args=(p,),daemon=True).start()
     def start_generation_replay()->None:
         r=state.get("result")
         if not isinstance(r,dict):status_var.set("Generate a maze first.");return
         if not generation_trace():status_var.set("No generation trace is available.");return
-        pause_replay();state.update({"mode":"generation","race_results":[],"playing":False,"replay_frame":0});compare_var.set("");status_var.set("Generation replay ready. Press ▶.");draw()
+        pause_replay();state.prepare_generation_replay();compare_var.set("");status_var.set("Generation replay ready. Press ▶.");draw()
 
     def calculate_all(base:dict)->list[tuple[str,dict]]:
         rows=[]
@@ -283,7 +283,7 @@ def _populate_maze_page(
     def finish_race(rows:list[tuple[str,dict]])->None:
         pause_replay()
         if not rows:fail("No race results were produced.");return
-        base=rows[0][1];state.update({"result":base,"race_results":rows,"mode":"race","playing":False,"replay_frame":0});summary_var.set(f"AI Race · {base.get('generator','')} · {len(rows)} solvers · optimal {int(base.get('optimal_steps',0))} steps");compare_var.set(race_table(0));status_var.set("AI Race ready. Press ▶.")
+        base=rows[0][1];state.load_race(rows);summary_var.set(f"AI Race · {base.get('generator','')} · {len(rows)} solvers · optimal {int(base.get('optimal_steps',0))} steps");compare_var.set(race_table(0));status_var.set("AI Race ready. Press ▶.")
         for b in all_buttons():b.configure(state="normal")
         draw()
     def race_worker(base:dict)->None:
@@ -298,7 +298,7 @@ def _populate_maze_page(
 
     def start_play()->None:
         if not isinstance(state.get("result"),dict):status_var.set("Generate a maze first.");return
-        if state.get("mode")!="search":state["mode"]="search";state["replay_frame"]=0
+        if state.get("mode")!="search":state.switch_to_search()
         pause_replay();play_logic.start(time.perf_counter());status_var.set("Playing: use Arrow keys or WASD.");canvas.focus_set();update_play_metrics();draw()
     def move(dx:int,dy:int)->None:
         r=state.get("result")
@@ -324,7 +324,7 @@ def _populate_maze_page(
         next_cell=play_logic.next_hint(r.get("optimal_path",[]))
         if next_cell is None:
             status_var.set("No next hint is available from the current position.");return
-        draw();app.after(1300,lambda:(state.__setitem__("hint",None),draw()))
+        draw();app.after(1300,lambda:(state.clear_hint(),draw()))
 
     generate_btn.configure(command=generate);generation_replay_btn.configure(command=start_generation_replay);compare_btn.configure(command=compare);race_btn.configure(command=start_race);play_btn.configure(command=start_play);hint_btn.configure(command=hint)
     reset_btn.configure(command=reset_replay);play_replay_btn.configure(command=start_replay);pause_btn.configure(command=pause_replay);step_btn.configure(command=step_replay);slower_btn.configure(command=lambda:change_speed(-1));faster_btn.configure(command=lambda:change_speed(1))
