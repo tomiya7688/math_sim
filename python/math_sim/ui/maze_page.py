@@ -10,9 +10,9 @@ from math_sim.application import (
     MazePlaybackController,
     MazePlaySessionController,
     MazeRaceController,
+    MazeSimulationService,
 )
 from math_sim.ui import theme
-from math_sim.upd.ui.maze.commander import MazeUiCommander
 
 GENERATOR_LABELS = {
     "Recursive Backtracker": "backtracker", "Randomized Prim": "prim",
@@ -38,7 +38,7 @@ PLAYBACK_SPEEDS = (0.25, 0.5, 1.0, 2.0, 4.0)
 def _populate_maze_page(
     app: tk.Misc,
     page: tk.Frame,
-    commander: MazeUiCommander,
+    service: MazeSimulationService,
     state: MazePageState,
 ) -> None:
     controls = tk.Frame(page, bg=theme.PANEL, width=315, highlightthickness=1, highlightbackground=theme.BORDER)
@@ -250,7 +250,7 @@ def _populate_maze_page(
         status_var.set(f"Error: {msg}")
         for b in all_buttons():b.configure(state="normal")
     def worker(p:dict)->None:
-        try:app.after(0,finish,commander.generate(**p))
+        try:app.after(0,finish,service.generate(**p))
         except Exception as e:app.after(0,fail,str(e))
     def generate()->None:
         try:p=params()
@@ -336,13 +336,13 @@ class MazePage(tk.Frame):
     def __init__(
         self,
         parent: tk.Widget,
-        commander: MazeUiCommander | None = None,
+        service: MazeSimulationService | None = None,
         state: MazePageState | None = None,
     ) -> None:
         super().__init__(parent, bg=theme.BG)
-        self.commander = commander or MazeUiCommander()
+        self.service = service or MazeSimulationService()
         self.state = state or MazePageState()
-        _populate_maze_page(self, self, self.commander, self.state)
+        _populate_maze_page(self, self, self.service, self.state)
 
 
 def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
