@@ -204,7 +204,7 @@ def _populate_maze_page(
         cancel_job()
         update_replay_status()
     def replay_tick()->None:
-        state["replay_job"]=None
+        state.clear_replay_job()
         if not state.get("replaying"):return
         if not playback_logic.advance():
             draw(); status_var.set("Replay finished."); return
@@ -292,7 +292,7 @@ def _populate_maze_page(
     def start_race()->None:
         try:p=params()
         except Exception as e:status_var.set(str(e));return
-        pause_replay();state["playing"]=False
+        pause_replay();state.finish_play()
         for b in all_buttons():b.configure(state="disabled")
         status_var.set("Preparing AI Race…");threading.Thread(target=race_worker,args=(p,),daemon=True).start()
 
