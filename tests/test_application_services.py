@@ -2,6 +2,7 @@ import unittest
 
 from math_sim.application import (
     ApplicationServices,
+    MazeSimulationService,
     MlpService,
     MonteCarloService,
     PerceptronService,
@@ -12,6 +13,53 @@ from math_sim.navigation import NavigationModel
 
 
 class ApplicationServiceTests(unittest.TestCase):
+
+    def test_maze_service_runs_solver_variants_with_shared_base(self):
+        calls = []
+
+        def runner(**kwargs):
+            calls.append(dict(kwargs))
+            return {"solver": kwargs["solver"], "seed": kwargs["seed"]}
+
+        service = MazeSimulationService(runner)
+        rows = service.compare_solvers(
+            {
+                "width": 4,
+                "height": 3,
+                "seed": 7,
+                "generator": "backtracker",
+                "solver": "bfs",
+            },
+            {"A*": "astar", "BFS": "bfs"},
+        )
+
+        self.assertEqual([label for label, _ in rows], ["A*", "BFS"])
+        self.assertEqual([call["solver"] for call in calls], ["astar", "bfs"])
+        self.assertTrue(all(call["seed"] == 7 for call in calls))
+
+    def test_maze_service_runs_generator_variants(self):
+        calls = []
+
+        def runner(**kwargs):
+            calls.append(dict(kwargs))
+            return {"generator": kwargs["generator"]}
+
+        service = MazeSimulationService(runner)
+        rows = service.compare_generators(
+            width=4,
+            height=3,
+            seed=9,
+            generators=("backtracker", "prim"),
+            solver="bfs",
+        )
+
+        self.assertEqual([name for name, _ in rows], ["backtracker", "prim"])
+        self.assertEqual(
+            [call["generator"] for call in calls],
+            ["backtracker", "prim"],
+        )
+        self.assertTrue(all(call["solver"] == "bfs" for call in calls))
+
     def test_monte_carlo_service_delegates_to_injected_runner(self):
         calls = []
 
@@ -70,6 +118,7 @@ class ApplicationServiceTests(unittest.TestCase):
         navigation = NavigationModel()
         services = ApplicationServices(
             navigation=navigation,
+            maze=MazeSimulationService(lambda **kwargs: {}),
             monte_carlo=MonteCarloService(lambda *args: None),
             random_tree=RandomTreeService(lambda **kwargs: {}),
             perceptron=PerceptronService(lambda **kwargs: {}),
