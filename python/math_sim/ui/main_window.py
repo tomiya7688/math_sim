@@ -121,9 +121,10 @@ class MainWindow(tk.Tk):
                 self.services.mlp,
             ),
             "pathfinding": PathfindingRouterPage(self, self.page_host),
-            "maze": MazePage(self.page_host),
+            "maze": MazePage(self.page_host, self.services.maze),
             "maze_generator_race": MazeGeneratorRacePage(
                 self.page_host,
+                self.services.maze,
             ),
         }
 
