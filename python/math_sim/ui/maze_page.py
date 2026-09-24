@@ -5,8 +5,13 @@ import time
 import tkinter as tk
 from tkinter import ttk
 
+from math_sim.application import (
+    MazePageState,
+    MazePlaybackController,
+    MazePlaySessionController,
+    MazeRaceController,
+)
 from math_sim.ui import theme
-from math_sim.ui.maze_state import MazePageState
 from math_sim.upd.ui.maze.commander import MazeUiCommander
 
 GENERATOR_LABELS = {
@@ -101,6 +106,9 @@ def _populate_maze_page(
     metrics=tk.Frame(view,bg=theme.PANEL); metrics.pack(fill="x",padx=14,pady=(0,14))
     play_metrics_var=tk.StringVar(value="Moves — | Time — | Optimal — | Loss — | Efficiency —")
     compare_var=tk.StringVar(value="")
+    playback_logic = MazePlaybackController(state)
+    play_logic = MazePlaySessionController(state)
+    race_logic = MazeRaceController()
     tk.Label(metrics,textvariable=play_metrics_var,bg=theme.PANEL_ALT,fg=theme.TEXT,anchor="w",padx=12,pady=8,
              font=(theme.FONT_FAMILY,9),highlightthickness=1,highlightbackground=theme.BORDER).pack(fill="x",pady=(0,6))
     tk.Label(metrics,textvariable=compare_var,bg=theme.PANEL_ALT,fg=theme.TEXT,anchor="w",justify="left",padx=12,pady=8,
@@ -115,43 +123,20 @@ def _populate_maze_page(
     def race_rows()->list[tuple[str,dict]]:
         rows=state.get("race_results"); return rows if isinstance(rows,list) else []
     def search_trace()->list:
-        r=state.get("result"); t=r.get("trace",[]) if isinstance(r,dict) else []; return t if isinstance(t,list) else []
+        return playback_logic.search_trace()
     def generation_trace()->list:
-        r=state.get("result"); t=r.get("generation_trace",[]) if isinstance(r,dict) else []; return t if isinstance(t,list) else []
+        return playback_logic.generation_trace()
     def replay_total()->int:
-        if state.get("mode")=="race": return max((len(r.get("trace",[])) for _,r in race_rows()),default=0)
-        if state.get("mode")=="generation": return len(generation_trace())
-        return len(search_trace())
+        return playback_logic.total_frames()
     def update_replay_status()->None:
         mode={"search":"Search","generation":"Generation","race":"Race"}.get(str(state.get("mode")),"Replay")
         playback_status_var.set(f"{mode} {min(int(state.get('replay_frame',0)),replay_total())} / {replay_total()} · {float(state.get('replay_speed',1.0)):g}x")
 
     def dynamic_generation_walls(width:int,height:int,frame:int)->list[int]:
-        walls=[15]*(width*height)
-        for edge in generation_trace()[:frame]:
-            if not isinstance(edge,(list,tuple)) or len(edge)!=4: continue
-            ax,ay,bx,by=map(int,edge); ai=ay*width+ax; bi=by*width+bx
-            dx,dy=bx-ax,by-ay
-            if dx==1: walls[ai]&=~EAST; walls[bi]&=~WEST
-            elif dx==-1: walls[ai]&=~WEST; walls[bi]&=~EAST
-            elif dy==1: walls[ai]&=~SOUTH; walls[bi]&=~NORTH
-            elif dy==-1: walls[ai]&=~NORTH; walls[bi]&=~SOUTH
-        return walls
+        return playback_logic.generation_walls(width, height, frame)
 
     def race_table(frame:int|None=None)->str:
-        rows=race_rows()
-        if not rows:return ""
-        head="AI                    status       steps   loss%   calculations"; completed=[]; running=[]
-        for label,r in rows:
-            finish=len(r.get("trace",[]))
-            (completed if frame is None or frame>=finish else running).append((finish,label,r) if frame is None or frame>=finish else (label,r))
-        completed.sort(key=lambda x:x[0]); ranks={label:i+1 for i,(_,label,_) in enumerate(completed)}
-        out=[]
-        for _,label,r in completed:
-            out.append(f"{label:<21} {'done' if frame is None else f'#{ranks[label]} FINISH':<11} {int(r.get('steps',0)):>5} {float(r.get('loss_percent',0.0)):>7.1f}% {int(r.get('calculation_count',0)):>12}")
-        for label,r in running:
-            finish=len(r.get("trace",[])); out.append(f"{label:<21} {f'{min(frame or 0,finish)}/{finish}':<11} {int(r.get('steps',0)):>5} {float(r.get('loss_percent',0.0)):>7.1f}% {int(r.get('calculation_count',0)):>12}")
-        return head+"\n"+"\n".join(out)
+        return race_logic.race_table(race_rows(), frame)
 
     def draw()->None:
         r=state.get("result")
@@ -214,33 +199,44 @@ def _populate_maze_page(
             try:app.after_cancel(job)
             except Exception:pass
         state["replay_job"]=None
-    def pause_replay()->None: state["replaying"]=False; cancel_job(); update_replay_status()
+    def pause_replay()->None:
+        playback_logic.pause()
+        cancel_job()
+        update_replay_status()
     def replay_tick()->None:
         state["replay_job"]=None
         if not state.get("replaying"):return
-        frame=int(state.get("replay_frame",0)); total=replay_total()
-        if frame>=total:
-            state["replaying"]=False; draw(); status_var.set("Replay finished."); return
-        state["replay_frame"]=frame+1; draw(); speed=max(float(state.get("replay_speed",1.0)),.01)
+        if not playback_logic.advance():
+            draw(); status_var.set("Replay finished."); return
+        draw(); speed=max(float(state.get("replay_speed",1.0)),.01)
         state["replay_job"]=app.after(max(10,int(120/speed)),replay_tick)
     def start_replay()->None:
-        if replay_total()<=0:status_var.set("No replay trace is available.");return
-        if int(state.get("replay_frame",0))>=replay_total():state["replay_frame"]=0
-        if not state.get("replaying"):state["replaying"]=True;replay_tick()
-    def reset_replay()->None: pause_replay(); state["replay_frame"]=0; draw()
-    def step_replay()->None: pause_replay(); state["replay_frame"]=min(int(state.get("replay_frame",0))+1,replay_total()); draw()
+        if not playback_logic.start():
+            status_var.set("No replay trace is available.");return
+        replay_tick()
+    def reset_replay()->None:
+        pause_replay(); playback_logic.reset(); draw()
+    def step_replay()->None:
+        pause_replay(); playback_logic.step(); draw()
     def change_speed(d:int)->None:
-        speed=float(state.get("replay_speed",1.0)); i=min(range(len(PLAYBACK_SPEEDS)),key=lambda n:abs(PLAYBACK_SPEEDS[n]-speed)); i=max(0,min(len(PLAYBACK_SPEEDS)-1,i+d)); state["replay_speed"]=PLAYBACK_SPEEDS[i]
-        if state.get("replaying"):cancel_job(); state["replay_job"]=app.after(max(10,int(120/PLAYBACK_SPEEDS[i])),replay_tick)
+        speed=playback_logic.change_speed(d)
+        if state.get("replaying"):
+            cancel_job(); state["replay_job"]=app.after(max(10,int(120/speed)),replay_tick)
         update_replay_status()
 
     def update_play_metrics()->None:
         r=state.get("result")
         if not isinstance(r,dict):return
-        elapsed=float(state.get("elapsed",0.0))
-        if state.get("playing") and isinstance(state.get("start_time"),float):elapsed=time.perf_counter()-float(state["start_time"]);state["elapsed"]=elapsed
-        moves,opt=int(state.get("moves",0)),int(r.get("optimal_steps",0)); loss=max(moves-opt,0) if moves else 0; lp=100*loss/opt if opt else 0; eff=100*opt/moves if moves and opt else 0
-        play_metrics_var.set(f"Moves {moves} | Time {elapsed:.1f}s | Optimal {opt} | Loss +{loss} ({lp:.1f}%) | Efficiency {eff:.1f}% | Backtracks {int(state.get('backtracks',0))}")
+        metrics=play_logic.metrics(
+            int(r.get("optimal_steps",0)),
+            time.perf_counter() if state.get("playing") else None,
+        )
+        play_metrics_var.set(
+            f"Moves {metrics.moves} | Time {metrics.elapsed:.1f}s | "
+            f"Optimal {metrics.optimal_steps} | Loss +{metrics.extra_steps} "
+            f"({metrics.loss_percent:.1f}%) | Efficiency "
+            f"{metrics.efficiency_percent:.1f}% | Backtracks {metrics.backtracks}"
+        )
         if state.get("playing"):app.after(100,update_play_metrics)
 
     all_buttons=lambda:(generate_btn,generation_replay_btn,compare_btn,race_btn,play_btn)
@@ -274,11 +270,9 @@ def _populate_maze_page(
         return rows
     def compare_worker(base:dict)->None:
         try:
-            rows=calculate_all(base); head="AI                    steps  loss      loss%    calculations"; body=[]
-            for label,r in rows:
-                if not r.get("found",False):body.append(f"{label:<21} {'FAIL':>5}  {'—':>8}  {'—':>7}  {int(r.get('calculation_count',0)):>12}")
-                else:body.append(f"{label:<21} {int(r.get('steps',0)):>5}  +{int(r.get('extra_steps',0)):<7}  {float(r.get('loss_percent',0)):>6.1f}%  {int(r.get('calculation_count',0)):>12}")
-            app.after(0,lambda:compare_var.set(head+"\n"+"\n".join(body)));app.after(0,lambda:status_var.set("Solver comparison completed"));app.after(0,lambda:[b.configure(state="normal") for b in all_buttons()])
+            rows=calculate_all(base)
+            table=race_logic.comparison_table(rows)
+            app.after(0,lambda:compare_var.set(table));app.after(0,lambda:status_var.set("Solver comparison completed"));app.after(0,lambda:[b.configure(state="normal") for b in all_buttons()])
         except Exception as e:app.after(0,fail,str(e))
     def compare()->None:
         try:p=params()
@@ -305,23 +299,21 @@ def _populate_maze_page(
     def start_play()->None:
         if not isinstance(state.get("result"),dict):status_var.set("Generate a maze first.");return
         if state.get("mode")!="search":state["mode"]="search";state["replay_frame"]=0
-        pause_replay();state.update({"player":(0,0),"moves":0,"backtracks":0,"visited_cells":{(0,0)},"elapsed":0.0,"start_time":time.perf_counter(),"playing":True,"hint":None});status_var.set("Playing: use Arrow keys or WASD.");canvas.focus_set();update_play_metrics();draw()
+        pause_replay();play_logic.start(time.perf_counter());status_var.set("Playing: use Arrow keys or WASD.");canvas.focus_set();update_play_metrics();draw()
     def move(dx:int,dy:int)->None:
-        if not state.get("playing"):return
         r=state.get("result")
-        if not isinstance(r,dict) or not isinstance(r.get("walls"),list):return
-        walls=r["walls"];w,h=int(r["width"]),int(r["height"]);x,y=map(int,state.get("player",(0,0)));wall=int(walls[y*w+x]);need=EAST if dx==1 else WEST if dx==-1 else SOUTH if dy==1 else NORTH;nx,ny=x+dx,y+dy
-        if wall&need or not(0<=nx<w and 0<=ny<h):return
-        state["moves"]=int(state.get("moves",0))+1;visited=state.get("visited_cells")
-        if isinstance(visited,set):
-            if(nx,ny)in visited:state["backtracks"]=int(state.get("backtracks",0))+1
-            visited.add((nx,ny))
-        state["player"]=(nx,ny);state["hint"]=None
-        if nx==w-1 and ny==h-1:
-            state["playing"]=False
-            if isinstance(state.get("start_time"),float):state["elapsed"]=time.perf_counter()-float(state["start_time"])
-            opt=int(r.get("optimal_steps",0));moves=int(state.get("moves",0));loss=max(moves-opt,0);lp=100*loss/opt if opt else 0;status_var.set(f"CLEAR! {moves} moves · loss +{loss} ({lp:.1f}%) · {float(state['elapsed']):.2f}s");update_play_metrics()
+        if not isinstance(r,dict):return
+        moved=play_logic.move(r,dx,dy,time.perf_counter())
+        if not moved.moved:return
+        if moved.finished:
+            metrics=play_logic.metrics(int(r.get("optimal_steps",0)))
+            status_var.set(
+                f"CLEAR! {metrics.moves} moves · loss +{metrics.extra_steps} "
+                f"({metrics.loss_percent:.1f}%) · {metrics.elapsed:.2f}s"
+            )
+            update_play_metrics()
         draw()
+
     def key(event)->str|None:
         mp={"up":(0,-1),"w":(0,-1),"down":(0,1),"s":(0,1),"left":(-1,0),"a":(-1,0),"right":(1,0),"d":(1,0)};k=event.keysym.lower()
         if k in mp:move(*mp[k]);return "break"
@@ -329,11 +321,10 @@ def _populate_maze_page(
     def hint()->None:
         r=state.get("result")
         if not isinstance(r,dict):status_var.set("Generate a maze first.");return
-        path=r.get("optimal_path",[]);player=tuple(state.get("player",(0,0)))
-        try:i=[tuple(p) for p in path].index(player)
-        except ValueError:status_var.set("You are off the original optimal path.");return
-        if i+1>=len(path):return
-        state["hint"]=tuple(path[i+1]);draw();app.after(1300,lambda:(state.__setitem__("hint",None),draw()))
+        next_cell=play_logic.next_hint(r.get("optimal_path",[]))
+        if next_cell is None:
+            status_var.set("No next hint is available from the current position.");return
+        draw();app.after(1300,lambda:(state.__setitem__("hint",None),draw()))
 
     generate_btn.configure(command=generate);generation_replay_btn.configure(command=start_generation_replay);compare_btn.configure(command=compare);race_btn.configure(command=start_race);play_btn.configure(command=start_play);hint_btn.configure(command=hint)
     reset_btn.configure(command=reset_replay);play_replay_btn.configure(command=start_replay);pause_btn.configure(command=pause_replay);step_btn.configure(command=step_replay);slower_btn.configure(command=lambda:change_speed(-1));faster_btn.configure(command=lambda:change_speed(1))
