@@ -12,12 +12,11 @@ class MazePageStateTests(unittest.TestCase):
         self.assertNotIn((1, 1), second.visited_cells)
         self.assertEqual(second.race_results, [])
 
-    def test_mapping_compatibility_rejects_unknown_keys(self):
-        state = MazePageState()
-        state["moves"] = 3
-        self.assertEqual(state.get("moves"), 3)
-        with self.assertRaises(KeyError):
-            state["unknown"] = 1
+    def test_state_is_read_only_from_callers(self):
+        state = MazePageState(moves=3)
+        self.assertEqual(state.moves, 3)
+        with self.assertRaises(AttributeError):
+            state.moves = 4
 
     def test_reset_play_session_restores_owned_state(self):
         state = MazePageState(
