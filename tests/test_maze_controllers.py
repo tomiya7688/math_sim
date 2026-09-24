@@ -10,20 +10,26 @@ from math_sim.application import (
 
 class MazePlaybackControllerTests(unittest.TestCase):
     def test_search_generation_and_race_totals(self):
-        state = MazePageState(result={"trace": [[0, 0], [1, 0]]})
-        controller = MazePlaybackController(state)
-        self.assertEqual(controller.total_frames(), 2)
+        search_state = MazePageState(result={"trace": [[0, 0], [1, 0]]})
+        self.assertEqual(MazePlaybackController(search_state).total_frames(), 2)
 
-        state.mode = "generation"
-        state.result = {"generation_trace": [[0, 0, 1, 0]]}
-        self.assertEqual(controller.total_frames(), 1)
+        generation_state = MazePageState(
+            result={"generation_trace": [[0, 0, 1, 0]]},
+            mode="generation",
+        )
+        self.assertEqual(
+            MazePlaybackController(generation_state).total_frames(),
+            1,
+        )
 
-        state.mode = "race"
-        state.race_results = [
-            ("A", {"trace": [1, 2, 3]}),
-            ("B", {"trace": [1]}),
-        ]
-        self.assertEqual(controller.total_frames(), 3)
+        race_state = MazePageState(
+            race_results=[
+                ("A", {"trace": [1, 2, 3]}),
+                ("B", {"trace": [1]}),
+            ],
+            mode="race",
+        )
+        self.assertEqual(MazePlaybackController(race_state).total_frames(), 3)
 
     def test_step_start_advance_and_speed(self):
         state = MazePageState(result={"trace": [1, 2]})
@@ -38,7 +44,7 @@ class MazePlaybackControllerTests(unittest.TestCase):
         self.assertFalse(controller.advance())
         self.assertFalse(state.replaying)
 
-        state.replay_speed = 1.0
+        self.assertEqual(state.replay_speed, 1.0)
         self.assertEqual(controller.change_speed(1), 2.0)
         self.assertEqual(controller.change_speed(-1), 1.0)
 
@@ -95,7 +101,7 @@ class MazePlaySessionControllerTests(unittest.TestCase):
         controller.move(result, -1, 0, 2.0)
         self.assertEqual(state.backtracks, 1)
 
-        state.player = (0, 0)
+        self.assertEqual(state.player, (0, 0))
         hint = controller.next_hint([[0, 0], [0, 1], [1, 1]])
         self.assertEqual(hint, (0, 1))
         self.assertEqual(state.hint, (0, 1))
