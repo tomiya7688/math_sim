@@ -94,6 +94,33 @@ def check_file(path: Path) -> list[Violation]:
                         )
                     )
 
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                func = node.func
+                if isinstance(func, ast.Name) and func.id.endswith("Service"):
+                    violations.append(
+                        Violation(
+                            path,
+                            node.lineno,
+                            "ARCH016",
+                            f"{mod}: UI must receive application services from the composition root instead of constructing {func.id}",
+                        )
+                    )
+                elif (
+                    isinstance(func, ast.Attribute)
+                    and func.attr == "default"
+                    and isinstance(func.value, ast.Name)
+                    and func.value.id == "ApplicationServices"
+                ):
+                    violations.append(
+                        Violation(
+                            path,
+                            node.lineno,
+                            "ARCH016",
+                            f"{mod}: UI must not create ApplicationServices; construct them at the application entrypoint",
+                        )
+                    )
+
         for line, imported in imports:
             if imported.startswith("math_sim.engines"):
                 violations.append(
