@@ -27,10 +27,10 @@ class MazeGeneratorRacePage(tk.Frame):
     def __init__(
         self,
         parent: tk.Widget,
-        service: MazeSimulationService | None = None,
+        service: MazeSimulationService,
     ) -> None:
         super().__init__(parent, bg=theme.BG)
-        self._service = service or MazeSimulationService()
+        self._service = service
         self._rows: list[tuple[str, dict]] = []
         self._frame = 0
         self._playing = False
@@ -500,9 +500,10 @@ class MazeGeneratorRacePage(tk.Frame):
 def build_maze_generator_race_page(
     app: tk.Misc,
     parent: tk.Widget,
+    service: MazeSimulationService,
 ) -> tk.Frame:
     del app
-    return MazeGeneratorRacePage(parent)
+    return MazeGeneratorRacePage(parent, service)
 
 
 __all__ = ["MazeGeneratorRacePage", "build_maze_generator_race_page"]
