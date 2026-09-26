@@ -70,6 +70,27 @@ int main() {
     assert(rejected);
 
     world.remove_body(id);
+
+    // Repeated lifecycle exercise for sanitizer/LSan coverage.
+    for (int iteration = 0; iteration < 1000; ++iteration) {
+        EulerPhysicsWorld repeated;
+        repeated.set_gravity({0.0, -9.81});
+        const auto repeated_id = repeated.create_body(BodyDefinition{
+            BodyType::Dynamic,
+            {0.0, 1.0},
+            {1.0, 0.0},
+            1.0,
+            0.01,
+        });
+        repeated.step(1.0 / 60.0);
+        repeated.pause(true);
+        repeated.step(1.0 / 60.0);
+        repeated.pause(false);
+        repeated.reset();
+        (void)repeated.body_state(repeated_id);
+        repeated.remove_body(repeated_id);
+    }
+
     bool missing = false;
     try {
         (void)world.body_state(id);
