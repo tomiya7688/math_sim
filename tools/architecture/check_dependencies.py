@@ -153,6 +153,18 @@ def check_file(path: Path) -> list[Violation]:
                     )
                 )
 
+    if not mod.startswith("math_sim.ui"):
+        for line, imported in imports:
+            if imported == "tkinter" or imported.startswith("tkinter."):
+                violations.append(
+                    Violation(
+                        path,
+                        line,
+                        "ARCH017",
+                        f"{mod}: tkinter is restricted to math_sim.ui modules",
+                    )
+                )
+
     def reject(prefixes: tuple[str, ...], rule: str, reason: str) -> None:
         for line, imported in imports:
             if imported.startswith(prefixes):
