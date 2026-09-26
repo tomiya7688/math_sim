@@ -16,14 +16,14 @@ from math_sim.ui.random_tree_page import RandomTreePage
 
 
 class MainWindow(tk.Tk):
-    def __init__(self, services: ApplicationServices | None = None) -> None:
+    def __init__(self, services: ApplicationServices) -> None:
         super().__init__()
         self.title("Math Sim")
         self.geometry("1180x720")
         self.minsize(980, 620)
         self.configure(bg=theme.BG)
 
-        self.services = services or ApplicationServices.default()
+        self.services = services
         self.navigation = self.services.navigation
 
         self._build_layout()
