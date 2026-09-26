@@ -44,6 +44,8 @@ jobs:
   sanitizers:
     runs-on: ubuntu-latest
     env:
+      CC: gcc-13
+      CXX: g++-13
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
       UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
       PYTHONPATH: python
@@ -52,10 +54,10 @@ jobs:
       - name: Configure sanitized C++ engines
         run: >
           cmake -S . -B build
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_BUILD_TYPE=Debug
           -DMATH_SIM_ENABLE_SANITIZERS=ON
       - name: Build sanitized C++ engines
-        run: cmake --build build --config RelWithDebInfo -j2
+        run: cmake --build build --config Debug -j2
       - name: Run sanitized C++ tests
         run: ctest --test-dir build --output-on-failure
       - name: Run sanitized native engine E2E
