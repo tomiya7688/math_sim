@@ -225,6 +225,21 @@ def check_file(path: Path) -> list[Violation]:
                     )
                 )
 
+    if mod.startswith("math_sim.runtime"):
+        reject(
+            (
+                "math_sim.ui",
+                "math_sim.upd.ui",
+                "math_sim.application",
+                "math_sim.registry",
+                "math_sim.search",
+                "math_sim.navigation",
+                "math_sim.simulations",
+            ),
+            "ARCH018",
+            "runtime infrastructure must remain lower-level than application/domain/UI modules",
+        )
+
     if mod.startswith("math_sim.engines"):
         reject(("math_sim.ui",), "ARCH004", "engine adapters must not depend on UI")
         for line, imported in imports:
