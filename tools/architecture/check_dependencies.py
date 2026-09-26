@@ -153,7 +153,7 @@ def check_file(path: Path) -> list[Violation]:
                     )
                 )
 
-    if not mod.startswith("math_sim.ui"):
+    if not (mod.startswith("math_sim.ui") or mod.startswith("math_sim.upd.ui")):
         for line, imported in imports:
             if imported == "tkinter" or imported.startswith("tkinter."):
                 violations.append(
