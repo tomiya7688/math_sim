@@ -296,7 +296,7 @@ class PerceptronPage(tk.Frame):
 def build_perceptron_page(
     app: tk.Misc,
     parent: tk.Widget,
-    service: PerceptronService | None = None,
+    service: PerceptronService,
 ) -> tk.Frame:
     del app
-    return PerceptronPage(parent, service or PerceptronService())
+    return PerceptronPage(parent, service)
