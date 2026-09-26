@@ -312,7 +312,7 @@ class MlpPage(tk.Frame):
 def build_mlp_page(
     app: tk.Misc,
     parent: tk.Widget,
-    service: MlpService | None = None,
+    service: MlpService,
 ) -> tk.Frame:
     del app
-    return MlpPage(parent, service or MlpService())
+    return MlpPage(parent, service)
