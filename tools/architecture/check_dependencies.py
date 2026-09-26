@@ -180,6 +180,11 @@ def check_file(path: Path) -> list[Violation]:
 
     if mod.startswith("math_sim.simulations"):
         reject(("math_sim.ui",), "ARCH003", "simulation/domain code must not depend on UI")
+        reject(
+            ("math_sim.navigation",),
+            "ARCH019",
+            "simulation/domain code must not depend on navigation",
+        )
 
     if mod.startswith("math_sim.application"):
         reject(("math_sim.ui",), "ARCH011", "application layer must not depend on UI")
