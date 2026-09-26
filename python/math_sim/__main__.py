@@ -69,11 +69,25 @@ def engine_e2e() -> int:
     return 0
 
 
+def ui_smoke_test() -> int:
+    services = ApplicationServices.default()
+    app = MainWindow(services)
+    try:
+        app.update_idletasks()
+        app.update()
+    finally:
+        app.destroy()
+    print("math_sim packaged UI smoke test passed")
+    return 0
+
+
 def main() -> None:
     if "--smoke-test" in sys.argv:
         raise SystemExit(smoke_test())
     if "--engine-e2e" in sys.argv:
         raise SystemExit(engine_e2e())
+    if "--ui-smoke" in sys.argv:
+        raise SystemExit(ui_smoke_test())
     services = ApplicationServices.default()
     app = MainWindow(services)
     app.mainloop()
