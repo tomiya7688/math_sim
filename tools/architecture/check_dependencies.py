@@ -47,6 +47,98 @@ def imported_modules(path: Path) -> list[tuple[int, str]]:
     return modules
 
 
+def canonical_module_name(path: Path) -> str:
+    relative = path.relative_to(ROOT / "python").with_suffix("")
+    parts = list(relative.parts)
+    if parts and parts[-1] == "__init__":
+        parts.pop()
+    return ".".join(parts)
+
+
+def resolved_import_modules(path: Path) -> list[tuple[int, str]]:
+    current = canonical_module_name(path)
+    package = current if path.name == "__init__.py" else current.rpartition(".")[0]
+    tree = parse_tree(path)
+    modules: list[tuple[int, str]] = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules.extend((node.lineno, alias.name) for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level == 0:
+                if node.module:
+                    modules.append((node.lineno, node.module))
+                continue
+
+            package_parts = package.split(".") if package else []
+            drop = max(node.level - 1, 0)
+            if drop > len(package_parts):
+                continue
+            base_parts = package_parts[: len(package_parts) - drop]
+            if node.module:
+                base_parts.extend(node.module.split("."))
+            if base_parts:
+                modules.append((node.lineno, ".".join(base_parts)))
+
+    return modules
+
+
+def dependency_cycles() -> list[tuple[str, ...]]:
+    paths = sorted(PACKAGE_ROOT.rglob("*.py"))
+    module_to_path = {
+        canonical_module_name(path): path
+        for path in paths
+    }
+    known = set(module_to_path)
+    graph: dict[str, set[str]] = {module: set() for module in known}
+
+    for module, path in module_to_path.items():
+        for _, imported in resolved_import_modules(path):
+            target = imported
+            while target and target not in known:
+                if "." not in target:
+                    target = ""
+                    break
+                target = target.rpartition(".")[0]
+            if target in known and target != module:
+                graph[module].add(target)
+
+    cycles: set[tuple[str, ...]] = set()
+    visiting: list[str] = []
+    active: set[str] = set()
+    complete: set[str] = set()
+
+    def normalize(cycle: list[str]) -> tuple[str, ...]:
+        ring = cycle[:-1]
+        rotations = [
+            tuple(ring[index:] + ring[:index])
+            for index in range(len(ring))
+        ]
+        best = min(rotations)
+        return best + (best[0],)
+
+    def visit(module: str) -> None:
+        if module in complete:
+            return
+        if module in active:
+            index = visiting.index(module)
+            cycles.add(normalize(visiting[index:] + [module]))
+            return
+
+        active.add(module)
+        visiting.append(module)
+        for target in sorted(graph[module]):
+            visit(target)
+        visiting.pop()
+        active.remove(module)
+        complete.add(module)
+
+    for module in sorted(graph):
+        visit(module)
+
+    return sorted(cycles)
+
+
 def load_parent_process_baseline() -> set[tuple[str, str]]:
     if not PARENT_PROCESS_BASELINE.exists():
         return set()
@@ -271,8 +363,22 @@ def check_file(path: Path) -> list[Violation]:
 
 def find_violations() -> list[Violation]:
     violations: list[Violation] = []
+    module_paths: dict[str, Path] = {}
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
         violations.extend(check_file(path))
+        module_paths[canonical_module_name(path)] = path
+
+    for cycle in dependency_cycles():
+        first = cycle[0]
+        path = module_paths[first]
+        violations.append(
+            Violation(
+                path,
+                1,
+                "ARCH020",
+                "circular dependency: " + " -> ".join(cycle),
+            )
+        )
     return violations
 
 
