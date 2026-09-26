@@ -265,9 +265,7 @@ def _populate_maze_page(
         pause_replay();state.prepare_generation_replay();compare_var.set("");status_var.set("Generation replay ready. Press ▶.");draw()
 
     def calculate_all(base:dict)->list[tuple[str,dict]]:
-        rows=[]
-        for label,solver in SOLVER_LABELS.items():p=dict(base);p["solver"]=solver;rows.append((label,commander.generate(**p)))
-        return rows
+        return service.compare_solvers(base, SOLVER_LABELS)
     def compare_worker(base:dict)->None:
         try:
             rows=calculate_all(base)
