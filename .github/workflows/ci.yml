@@ -23,6 +23,8 @@ jobs:
         run: ruff check python/math_sim --select F821
       - name: Architecture dependency gate
         run: python tools/architecture/check_dependencies.py
+      - name: C# oop-design-checker readiness gate
+        run: python tools/architecture/check_csharp_oop_gate.py
       - name: Run dependency-free Python tests
         env:
           PYTHONPATH: python
