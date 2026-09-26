@@ -18,7 +18,7 @@ jobs:
       - name: Python syntax check
         run: python -m compileall -q python/math_sim
       - name: Install static checker
-        run: python -m pip install --disable-pip-version-check ruff
+        run: python -m pip install --disable-pip-version-check ruff==0.16.9
       - name: Python undefined-name check
         run: ruff check python/math_sim --select F821
       - name: Architecture dependency gate
