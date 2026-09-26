@@ -40,3 +40,23 @@ jobs:
         env:
           PYTHONPATH: python
         run: python -m unittest discover -s tests/e2e -p "test_*.py"
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+      PYTHONPATH: python
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure sanitized C++ engines
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DMATH_SIM_ENABLE_SANITIZERS=ON
+      - name: Build sanitized C++ engines
+        run: cmake --build build --config RelWithDebInfo -j2
+      - name: Run sanitized C++ tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Run sanitized native engine E2E
+        run: python -m unittest discover -s tests/e2e -p "test_*.py"
