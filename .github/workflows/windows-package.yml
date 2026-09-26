@@ -60,6 +60,9 @@ jobs:
       - name: Packaged runtime smoke test
         run: dist/math_sim/math_sim.exe --smoke-test
 
+      - name: Packaged UI smoke test
+        run: dist/math_sim/math_sim.exe --ui-smoke
+
       - name: Packaged parent-to-engine E2E
         run: dist/math_sim/math_sim.exe --engine-e2e
 
