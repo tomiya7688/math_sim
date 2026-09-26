@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 
+from math_sim.application import ApplicationServices
 from math_sim.engines.maze import generate_and_solve_maze
 from math_sim.engines.mlp import train_logic_gate as train_mlp
 from math_sim.engines.monte_carlo import estimate_pi, integrate_expression
@@ -73,7 +74,8 @@ def main() -> None:
         raise SystemExit(smoke_test())
     if "--engine-e2e" in sys.argv:
         raise SystemExit(engine_e2e())
-    app = MainWindow()
+    services = ApplicationServices.default()
+    app = MainWindow(services)
     app.mainloop()
 
 
