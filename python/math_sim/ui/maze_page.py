@@ -334,18 +334,18 @@ class MazePage(tk.Frame):
     def __init__(
         self,
         parent: tk.Widget,
-        service: MazeSimulationService | None = None,
+        service: MazeSimulationService,
         state: MazePageState | None = None,
     ) -> None:
         super().__init__(parent, bg=theme.BG)
-        self.service = service or MazeSimulationService()
+        self.service = service
         self.state = state or MazePageState()
         _populate_maze_page(self, self, self.service, self.state)
 
 
-def build_maze_page(app: tk.Misc, parent: tk.Widget) -> tk.Frame:
+def build_maze_page(app: tk.Misc, parent: tk.Widget, service: MazeSimulationService) -> tk.Frame:
     del app
-    return MazePage(parent)
+    return MazePage(parent, service)
 
 
 __all__ = ["MazePage", "build_maze_page"]
