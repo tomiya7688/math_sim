@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import ast
 from dataclasses import dataclass
 import json
@@ -204,6 +205,97 @@ def check_cpp_file(path: Path) -> list[Violation]:
                         f"{relative}: {rule['reason']}: {include}",
                     )
                 )
+    return violations
+
+
+def cmake_link_command(
+    backtrace_graph: dict, backtrace_index: int | None
+) -> tuple[Path, int] | None:
+    if backtrace_index is None or backtrace_index < 0:
+        return None
+    nodes = backtrace_graph.get("nodes", [])
+    if backtrace_index >= len(nodes):
+        return None
+    node = nodes[backtrace_index]
+    command_index = node.get("command")
+    file_index = node.get("file")
+    commands = backtrace_graph.get("commands", [])
+    files = backtrace_graph.get("files", [])
+    if (
+        command_index is None
+        or command_index >= len(commands)
+        or file_index is None
+        or file_index >= len(files)
+        or commands[command_index].lower() != "target_link_libraries"
+    ):
+        return None
+    path = Path(files[file_index])
+    if not path.is_absolute():
+        path = ROOT / path
+    return path, node.get("line", 1)
+
+
+def check_cmake_target_link_rules(build_dir: Path) -> list[Violation]:
+    """Check direct CMake target links from the configured File API codemodel."""
+    reply_dir = build_dir / ".cmake" / "api" / "v1" / "reply"
+    indexes = sorted(reply_dir.glob("index-*.json"), key=lambda path: path.stat().st_mtime)
+    if not indexes:
+        raise FileNotFoundError(
+            "CMake File API reply not found in "
+            f"{reply_dir}; configure with a codemodel-v2 query first"
+        )
+
+    index = json.loads(indexes[-1].read_text(encoding="utf-8"))
+    codemodel_reply = index.get("reply", {}).get("codemodel-v2")
+    if not codemodel_reply:
+        raise ValueError(f"CMake File API codemodel-v2 reply missing from {indexes[-1]}")
+    codemodel_path = reply_dir / codemodel_reply["jsonFile"]
+    codemodel = json.loads(codemodel_path.read_text(encoding="utf-8"))
+
+    targets: dict[str, dict] = {}
+    target_data: list[dict] = []
+    for target_ref in codemodel.get("configurations", [{}])[0].get("targets", []):
+        target_path = codemodel_path.parent / target_ref["jsonFile"]
+        target = json.loads(target_path.read_text(encoding="utf-8"))
+        source_dir = target.get("paths", {}).get("source", "")
+        if not Path(source_dir).is_absolute():
+            source_dir = Path(source_dir).as_posix().removeprefix("./")
+        target["_source_directory"] = Path(source_dir).as_posix()
+        targets[target["id"]] = target
+        target_data.append(target)
+
+    rules = load_dependency_rules().get("cmake_target_link_rules", [])
+    violations: list[Violation] = []
+    for source in target_data:
+        graph = source.get("backtraceGraph", {})
+        source_dir = source["_source_directory"]
+        for dependency in source.get("dependencies", []):
+            target_link_call = cmake_link_command(graph, dependency.get("backtrace"))
+            if target_link_call is None:
+                continue
+            dependency_target = targets.get(dependency.get("id"))
+            if dependency_target is None:
+                continue
+            dependency_dir = dependency_target["_source_directory"]
+            for rule in rules:
+                source_matches = any(
+                    source_dir.startswith(prefix)
+                    for prefix in rule.get("source_directory_prefixes", [])
+                )
+                dependency_matches = any(
+                    dependency_dir.startswith(prefix)
+                    for prefix in rule.get("forbidden_dependency_directory_prefixes", [])
+                )
+                if source_matches and dependency_matches:
+                    path, line = target_link_call
+                    violations.append(
+                        Violation(
+                            path,
+                            line,
+                            rule["rule"],
+                            f"{source['name']} -> {dependency_target['name']}: {rule['reason']}",
+                        )
+                    )
     return violations
 
 
@@ -451,7 +543,16 @@ def find_violations() -> list[Violation]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--cmake-build-dir",
+        type=Path,
+        help="also inspect CMake target_link_libraries relationships from this build tree",
+    )
+    args = parser.parse_args()
     violations = find_violations()
+    if args.cmake_build_dir is not None:
+        violations.extend(check_cmake_target_link_rules(args.cmake_build_dir))
     for violation in violations:
         print(violation.github_annotation())
     if violations:

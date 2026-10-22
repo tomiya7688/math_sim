@@ -10,8 +10,8 @@ They inspect source or repository metadata and report violations. They do not re
 
 ## Structure
 
-- `check_dependencies.py` checks Python package dependency direction and cycles, plus configured C++ header/include boundaries.
-- `.github/dependency-rules.json` declares extensible Python import and C++ include boundaries consumed by `check_dependencies.py`.
+- `check_dependencies.py` checks Python package dependency direction and cycles, plus configured C++ header/include and CMake target-link boundaries.
+- `.github/dependency-rules.json` declares extensible Python import, C++ include, and CMake target-link boundaries consumed by `check_dependencies.py`.
 - `check_csharp_oop_gate.py` checks readiness and configuration for the C# design gate.
 - `check_readmes.py` checks README coverage, required sections for newly added modules, and relative links.
 - `check_json_like_comments.py` checks structured comments on newly added production declarations.
@@ -19,7 +19,9 @@ They inspect source or repository metadata and report violations. They do not re
 
 ## Build and test
 
-No build step is required. Run a checker from the repository root with Python 3, for example `python tools/architecture/check_readmes.py`. The README gate also runs in GitHub Actions.
+The Python and source-level checks need no build. Run a checker from the repository root with Python 3, for example `python tools/architecture/check_readmes.py`. The README gate also runs in GitHub Actions.
+
+The dependency checker reads the configured CMake build's File API codemodel for target-link rules. Request `codemodel-v2` before CMake configuration and pass the build directory with `--cmake-build-dir`; CI does this before its CMake configure step.
 
 ## Inputs, outputs, and errors
 
