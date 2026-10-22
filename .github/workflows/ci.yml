@@ -106,3 +106,67 @@ jobs:
           else
             python tools/architecture/check_json_like_comments.py
           fi
+
+  go-quality:
+    name: Go quality gates
+    if: ${{ hashFiles('**/go.mod') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.x'
+      - name: Install Go analyzers
+        env:
+          GOBIN: ${{ runner.temp }}/go-tools
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
+          go install github.com/gordonklaus/ineffassign@v0.2.0
+          go install github.com/kisielk/errcheck@v1.20.0
+          echo "$GOBIN" >> "$GITHUB_PATH"
+      - name: Check gofmt
+        shell: bash
+        run: |
+          mapfile -d '' files < <(git ls-files -z '*.go')
+          if ((${#files[@]})); then
+            unformatted="$(gofmt -l "${files[@]}")"
+            if [[ -n "$unformatted" ]]; then
+              printf '%s\n' "$unformatted"
+              exit 1
+            fi
+          fi
+      - name: Vet and lint every Go module
+        shell: bash
+        run: |
+          while IFS= read -r -d '' module_file; do
+            module_dir="$(dirname "$module_file")"
+            echo "Checking Go module: $module_dir"
+            pushd "$module_dir" >/dev/null
+            go vet ./...
+            staticcheck ./...
+            ineffassign ./...
+            errcheck -blank -assert ./...
+            popd >/dev/null
+          done < <(find . -name go.mod -not -path './.git/*' -not -path '*/vendor/*' -print0 | sort -z)
+
+  rust-quality:
+    name: Rust quality gates
+    if: ${{ hashFiles('**/Cargo.toml') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting and Clippy in every Rust manifest
+        shell: bash
+        run: |
+          while IFS= read -r -d '' manifest; do
+            echo "Checking Rust manifest: $manifest"
+            cargo fmt --manifest-path "$manifest" --all -- --check
+            if grep -q '^\[workspace\]' "$manifest"; then
+              cargo clippy --manifest-path "$manifest" --workspace --all-targets --all-features -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
+            else
+              cargo clippy --manifest-path "$manifest" --all-targets --all-features -- -D warnings -D clippy::unwrap_used -D clippy::expect_used
+            fi
+          done < <(find . -name Cargo.toml -not -path './.git/*' -not -path '*/target/*' -print0 | sort -z)

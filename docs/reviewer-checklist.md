@@ -21,6 +21,7 @@
 - [ ] 閾値や制約値に名前があり、例外的なliteralは文脈から意味が分かる
 - [ ] error / Result / 戻り値を確認し、失敗を握りつぶさず適切に伝えている
 - [ ] bool比較が冗長でなく、死んだコードや常に同じ結果になる条件がない
+- [ ] Go / Rust変更では該当moduleのformatter・linter・error/result検査が成功し、`unwrap` / `expect`に理由がある（該当時）
 - [ ] 新規production宣言のJSON-like comment blockに宣言名・必須キーがあり、説明が実装と一致する（該当時）
 - [ ] 必須CI・自動検査は対象PRの最新headで成功し、欠落・未実行を成功扱いしていない
 - [ ] 実装が共有契約・設計と一致し、層の依存方向を破っていない
