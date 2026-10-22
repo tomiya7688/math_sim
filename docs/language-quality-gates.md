@@ -23,4 +23,4 @@ GoまたはRustのproduction moduleがrepositoryへ追加された時点で、CI
 
 ## 適用範囲と人の確認
 
-これらのjobはGo moduleまたはCargo manifestが存在するときに有効になる。linterは命名の適切さ、数値の意味、失敗時の利用者影響までは判定しない。[レビュー基準](review-policy.md)と[レビューチェックリスト](reviewer-checklist.md)で人が確認する。新しい言語を追加するPRでは、その言語の標準formatter、静的解析、error/result検査を同時に導入する。
+CIの検出jobがGo moduleまたはCargo manifestの有無を出力し、存在する言語の品質jobだけを実行する。linterは命名の適切さ、数値の意味、失敗時の利用者影響までは判定しない。[レビュー基準](review-policy.md)と[レビューチェックリスト](reviewer-checklist.md)で人が確認する。新しい言語を追加するPRでは、その言語の標準formatter、静的解析、error/result検査を同時に導入する。
