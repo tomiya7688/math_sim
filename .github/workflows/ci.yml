@@ -65,3 +65,23 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Run sanitized native engine E2E
         run: python -m unittest discover -s tests/e2e -p "test_*.py"
+
+  readme-gate:
+    name: README coverage and review gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pull request base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
+      - name: Check README coverage, requirements, and links
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            python tools/architecture/check_readmes.py --base "$BASE_SHA"
+          else
+            python tools/architecture/check_readmes.py
+          fi
