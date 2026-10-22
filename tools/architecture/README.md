@@ -10,7 +10,8 @@ They inspect source or repository metadata and report violations. They do not re
 
 ## Structure
 
-- `check_dependencies.py` checks Python package dependency direction and cycles.
+- `check_dependencies.py` checks Python package dependency direction and cycles, plus configured C++ header/include boundaries.
+- `.github/dependency-rules.json` declares extensible Python import and C++ include boundaries consumed by `check_dependencies.py`.
 - `check_csharp_oop_gate.py` checks readiness and configuration for the C# design gate.
 - `check_readmes.py` checks README coverage, required sections for newly added modules, and relative links.
 - `check_json_like_comments.py` checks structured comments on newly added production declarations.
