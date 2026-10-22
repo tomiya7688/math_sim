@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
+import json
 from pathlib import Path
+import re
 import sys
 
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_ROOT = ROOT / "python" / "math_sim"
 PARENT_PROCESS_BASELINE = ROOT / "tools" / "architecture" / "parent_process_baseline.json"
+DEPENDENCY_RULES_PATH = ROOT / ".github" / "dependency-rules.json"
+CPP_INCLUDE_PATTERN = re.compile(r'^\s*#\s*include\s*[<"]([^">]+)[">]')
 
 
 @dataclass(frozen=True)
@@ -150,10 +154,64 @@ def load_parent_process_baseline() -> set[tuple[str, str]]:
     }
 
 
+def load_dependency_rules() -> dict:
+    return json.loads(DEPENDENCY_RULES_PATH.read_text(encoding="utf-8"))
+
+
+def check_configured_python_import_rules(
+    path: Path, mod: str, imports: list[tuple[int, str]]
+) -> list[Violation]:
+    violations: list[Violation] = []
+    for rule in load_dependency_rules().get("python_import_rules", []):
+        if not any(mod.startswith(prefix) for prefix in rule["source_prefixes"]):
+            continue
+        for line, imported in imports:
+            exact = imported in rule.get("forbidden_imports", [])
+            prefix = any(
+                imported.startswith(value)
+                for value in rule.get("forbidden_import_prefixes", [])
+            )
+            if exact or prefix:
+                violations.append(
+                    Violation(path, line, rule["rule"], f"{mod}: {rule['reason']}: {imported}")
+                )
+    return violations
+
+
+def check_cpp_file(path: Path) -> list[Violation]:
+    relative = path.relative_to(ROOT).as_posix()
+    violations: list[Violation] = []
+    rules = load_dependency_rules().get("cpp_include_rules", [])
+    for line_number, source_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), start=1
+    ):
+        match = CPP_INCLUDE_PATTERN.match(source_line)
+        if not match:
+            continue
+        include = match.group(1).replace("\\", "/")
+        for rule in rules:
+            if not any(relative.startswith(prefix) for prefix in rule["source_prefixes"]):
+                continue
+            if any(
+                include.startswith(prefix)
+                for prefix in rule.get("forbidden_include_prefixes", [])
+            ):
+                violations.append(
+                    Violation(
+                        path,
+                        line_number,
+                        rule["rule"],
+                        f"{relative}: {rule['reason']}: {include}",
+                    )
+                )
+    return violations
+
+
 def check_file(path: Path) -> list[Violation]:
     mod = module_name(path)
     imports = imported_modules(path)
     violations: list[Violation] = []
+    violations.extend(check_configured_python_import_rules(path, mod, imports))
 
     if mod.startswith("math_sim.ui"):
         tree = parse_tree(path)
@@ -367,6 +425,16 @@ def find_violations() -> list[Violation]:
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
         violations.extend(check_file(path))
         module_paths[canonical_module_name(path)] = path
+
+    cpp_root = ROOT / "cpp"
+    if cpp_root.exists():
+        cpp_extensions = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
+        cpp_paths = sorted(
+            path for path in cpp_root.rglob("*")
+            if path.is_file() and path.suffix.lower() in cpp_extensions
+        )
+        for path in cpp_paths:
+            violations.extend(check_cpp_file(path))
 
     for cycle in dependency_cycles():
         first = cycle[0]

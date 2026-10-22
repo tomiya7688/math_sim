@@ -1,0 +1,30 @@
+{
+  "python_import_rules": [
+    {
+      "rule": "ARCH021",
+      "source_prefixes": ["math_sim.simulations"],
+      "forbidden_imports": ["subprocess"],
+      "forbidden_import_prefixes": ["subprocess."],
+      "reason": "simulation/domain code must not launch processes directly; use the runtime boundary"
+    }
+  ],
+  "cpp_include_rules": [
+    {
+      "rule": "ARCH022",
+      "source_prefixes": ["cpp/include/math_sim/"],
+      "forbidden_include_prefixes": [
+        "math_sim/ui/",
+        "math_sim/application/",
+        "math_sim/runtime/",
+        "math_sim/simulations/"
+      ],
+      "reason": "shared C++ domain headers must not depend on UI, application, runtime, or concrete simulation layers"
+    },
+    {
+      "rule": "ARCH023",
+      "source_prefixes": ["cpp/engines/"],
+      "forbidden_include_prefixes": ["math_sim/ui/"],
+      "reason": "native engine adapters must not depend on UI code"
+    }
+  ]
+}

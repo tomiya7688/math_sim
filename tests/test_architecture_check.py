@@ -33,6 +33,20 @@ class ArchitectureCheckTests(unittest.TestCase):
                 architecture_check.ROOT = old_root
                 architecture_check.PACKAGE_ROOT = old_package
 
+    def _check_cpp(self, source_path: str, source: str):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            path = root / Path(*source_path.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(source, encoding="utf-8")
+
+            old_root = architecture_check.ROOT
+            architecture_check.ROOT = root
+            try:
+                return architecture_check.check_cpp_file(path)
+            finally:
+                architecture_check.ROOT = old_root
+
     def test_domain_importing_ui_is_rejected(self):
         violations = self._check(
             "math_sim.simulations.bad",
@@ -130,6 +144,55 @@ class ArchitectureCheckTests(unittest.TestCase):
             "class Good:\n    def __init__(self):\n        self._value = 1\n",
         )
         self.assertNotIn("ARCH015", [item.rule for item in violations])
+
+    def test_simulation_domain_importing_subprocess_is_rejected_by_config(self):
+        violations = self._check(
+            "math_sim.simulations.bad",
+            "import subprocess\n",
+        )
+        self.assertIn("ARCH021", [item.rule for item in violations])
+
+    def test_cpp_domain_header_importing_ui_is_rejected_by_config(self):
+        violations = self._check_cpp(
+            "cpp/include/math_sim/bad.hpp",
+            '#include "math_sim/ui/theme.hpp"\n',
+        )
+        self.assertEqual([item.rule for item in violations], ["ARCH022"])
+
+    def test_cpp_domain_header_can_include_domain_header(self):
+        violations = self._check_cpp(
+            "cpp/include/math_sim/good.hpp",
+            '#include "math_sim/pathfinding.hpp"\n',
+        )
+        self.assertEqual(violations, [])
+
+    def test_cpp_engine_cannot_include_ui(self):
+        violations = self._check_cpp(
+            "cpp/engines/maze/main.cpp",
+            '#include "math_sim/ui/theme.hpp"\n',
+        )
+        self.assertEqual([item.rule for item in violations], ["ARCH023"])
+
+    def test_python_package_cycle_is_reported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            package = root / "python" / "math_sim"
+            package.mkdir(parents=True)
+            (package / "a.py").write_text("import math_sim.b\n", encoding="utf-8")
+            (package / "b.py").write_text("import math_sim.a\n", encoding="utf-8")
+
+            old_root = architecture_check.ROOT
+            old_package = architecture_check.PACKAGE_ROOT
+            architecture_check.ROOT = root
+            architecture_check.PACKAGE_ROOT = package
+            try:
+                self.assertEqual(
+                    architecture_check.dependency_cycles(),
+                    [("math_sim.a", "math_sim.b", "math_sim.a")],
+                )
+            finally:
+                architecture_check.ROOT = old_root
+                architecture_check.PACKAGE_ROOT = old_package
 
 
 if __name__ == "__main__":
