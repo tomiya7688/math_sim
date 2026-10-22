@@ -1,6 +1,68 @@
 {
   "python_import_rules": [
     {
+      "rule": "ARCH001",
+      "source_modules": ["math_sim.registry"],
+      "forbidden_import_prefixes": ["math_sim.ui", "math_sim.engines", "math_sim.simulations"],
+      "reason": "registry metadata must not depend on UI or demo implementations"
+    },
+    {
+      "rule": "ARCH002",
+      "source_modules": ["math_sim.search"],
+      "forbidden_import_prefixes": ["math_sim.ui", "math_sim.engines", "math_sim.simulations"],
+      "reason": "search must depend on registry metadata only"
+    },
+    {
+      "rule": "ARCH003",
+      "source_prefixes": ["math_sim.simulations"],
+      "forbidden_import_prefixes": ["math_sim.ui"],
+      "reason": "simulation/domain code must not depend on UI"
+    },
+    {
+      "rule": "ARCH004",
+      "source_prefixes": ["math_sim.engines"],
+      "forbidden_import_prefixes": ["math_sim.ui"],
+      "reason": "engine adapters must not depend on UI"
+    },
+    {
+      "rule": "ARCH005",
+      "source_prefixes": ["math_sim.upd.contracts"],
+      "forbidden_import_prefixes": ["math_sim.upd.ui", "math_sim.upd.process"],
+      "reason": "UPD contracts must remain layer-neutral"
+    },
+    {
+      "rule": "ARCH006",
+      "source_prefixes": ["math_sim.upd.process"],
+      "forbidden_import_prefixes": ["math_sim.upd.ui"],
+      "reason": "UPD process layer must not depend on UI layer"
+    },
+    {
+      "rule": "ARCH011",
+      "source_prefixes": ["math_sim.application"],
+      "forbidden_import_prefixes": ["math_sim.ui"],
+      "reason": "application layer must not depend on UI"
+    },
+    {
+      "rule": "ARCH018",
+      "source_prefixes": ["math_sim.runtime"],
+      "forbidden_import_prefixes": [
+        "math_sim.ui",
+        "math_sim.upd.ui",
+        "math_sim.application",
+        "math_sim.registry",
+        "math_sim.search",
+        "math_sim.navigation",
+        "math_sim.simulations"
+      ],
+      "reason": "runtime infrastructure must remain lower-level than application/domain/UI modules"
+    },
+    {
+      "rule": "ARCH019",
+      "source_prefixes": ["math_sim.simulations"],
+      "forbidden_import_prefixes": ["math_sim.navigation"],
+      "reason": "simulation/domain code must not depend on navigation"
+    },
+    {
       "rule": "ARCH021",
       "source_prefixes": ["math_sim.simulations"],
       "forbidden_imports": ["subprocess"],

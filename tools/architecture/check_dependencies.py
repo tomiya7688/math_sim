@@ -164,7 +164,11 @@ def check_configured_python_import_rules(
 ) -> list[Violation]:
     violations: list[Violation] = []
     for rule in load_dependency_rules().get("python_import_rules", []):
-        if not any(mod.startswith(prefix) for prefix in rule["source_prefixes"]):
+        exact_sources = mod in rule.get("source_modules", [])
+        prefix_sources = any(
+            mod.startswith(prefix) for prefix in rule.get("source_prefixes", [])
+        )
+        if not (exact_sources or prefix_sources):
             continue
         for line, imported in imports:
             exact = imported in rule.get("forbidden_imports", [])
@@ -407,29 +411,7 @@ def check_file(path: Path) -> list[Violation]:
                     )
                 )
 
-    def reject(prefixes: tuple[str, ...], rule: str, reason: str) -> None:
-        for line, imported in imports:
-            if imported.startswith(prefixes):
-                violations.append(Violation(path, line, rule, f"{mod}: {reason}: {imported}"))
-
-    if mod == "math_sim.registry":
-        reject(("math_sim.ui", "math_sim.engines", "math_sim.simulations"),
-               "ARCH001", "registry metadata must not depend on UI or demo implementations")
-
-    if mod == "math_sim.search":
-        reject(("math_sim.ui", "math_sim.engines", "math_sim.simulations"),
-               "ARCH002", "search must depend on registry metadata only")
-
-    if mod.startswith("math_sim.simulations"):
-        reject(("math_sim.ui",), "ARCH003", "simulation/domain code must not depend on UI")
-        reject(
-            ("math_sim.navigation",),
-            "ARCH019",
-            "simulation/domain code must not depend on navigation",
-        )
-
     if mod.startswith("math_sim.application"):
-        reject(("math_sim.ui",), "ARCH011", "application layer must not depend on UI")
         tree = parse_tree(path)
         for node in ast.walk(tree):
             targets: list[ast.expr] = []
@@ -472,23 +454,7 @@ def check_file(path: Path) -> list[Violation]:
                     )
                 )
 
-    if mod.startswith("math_sim.runtime"):
-        reject(
-            (
-                "math_sim.ui",
-                "math_sim.upd.ui",
-                "math_sim.application",
-                "math_sim.registry",
-                "math_sim.search",
-                "math_sim.navigation",
-                "math_sim.simulations",
-            ),
-            "ARCH018",
-            "runtime infrastructure must remain lower-level than application/domain/UI modules",
-        )
-
     if mod.startswith("math_sim.engines"):
-        reject(("math_sim.ui",), "ARCH004", "engine adapters must not depend on UI")
         for line, imported in imports:
             if imported == "subprocess" or imported.startswith("subprocess."):
                 violations.append(
@@ -499,14 +465,6 @@ def check_file(path: Path) -> list[Violation]:
                         f"{mod}: engine adapters must use math_sim.runtime.EngineProcess instead of subprocess directly",
                     )
                 )
-
-    if mod.startswith("math_sim.upd.contracts"):
-        reject(("math_sim.upd.ui", "math_sim.upd.process"),
-               "ARCH005", "UPD contracts must remain layer-neutral")
-
-    if mod.startswith("math_sim.upd.process"):
-        reject(("math_sim.upd.ui",),
-               "ARCH006", "UPD process layer must not depend on UI layer")
 
     return violations
 

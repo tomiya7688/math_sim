@@ -62,6 +62,55 @@ class ArchitectureCheckTests(unittest.TestCase):
         )
         self.assertEqual([item.rule for item in violations], ["ARCH006"])
 
+    def test_search_importing_demo_implementation_is_rejected(self):
+        violations = self._check(
+            "math_sim.search",
+            "from math_sim.simulations.maze import MazeSimulation\n",
+        )
+        self.assertEqual([item.rule for item in violations], ["ARCH002"])
+
+    def test_simulation_importing_navigation_is_rejected(self):
+        violations = self._check(
+            "math_sim.simulations.bad",
+            "from math_sim.navigation import navigate\n",
+        )
+        self.assertEqual([item.rule for item in violations], ["ARCH019"])
+
+    def test_engine_adapter_importing_ui_is_rejected(self):
+        violations = self._check(
+            "math_sim.engines.bad_adapter",
+            "from math_sim.ui import theme\n",
+        )
+        self.assertEqual([item.rule for item in violations], ["ARCH004"])
+
+    def test_contract_importing_process_is_rejected(self):
+        violations = self._check(
+            "math_sim.upd.contracts.bad_contract",
+            "from math_sim.upd.process import Runner\n",
+        )
+        self.assertEqual([item.rule for item in violations], ["ARCH005"])
+
+    def test_application_importing_ui_is_rejected_by_config(self):
+        violations = self._check(
+            "math_sim.application.bad_service",
+            "from math_sim.ui import theme\n",
+        )
+        self.assertEqual([item.rule for item in violations], ["ARCH011"])
+
+    def test_runtime_importing_application_is_rejected(self):
+        violations = self._check(
+            "math_sim.runtime.bad_runtime",
+            "from math_sim.application import Controller\n",
+        )
+        self.assertEqual([item.rule for item in violations], ["ARCH018"])
+
+    def test_exact_source_rule_does_not_match_a_suffixed_module(self):
+        violations = self._check(
+            "math_sim.registry_extra",
+            "from math_sim.ui import theme\n",
+        )
+        self.assertNotIn("ARCH001", [item.rule for item in violations])
+
     def test_search_importing_registry_is_allowed(self):
         violations = self._check(
             "math_sim.search",
