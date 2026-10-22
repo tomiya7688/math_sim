@@ -28,6 +28,15 @@ def function_comment(name="step"):
 // }}'''
 
 
+def class_comment(name="Engine"):
+    return f'''// {{
+//   責務: [
+//     {name}: 演算エンジンを表す
+//   ],
+//   フィールド: []
+// }}'''
+
+
 class JsonLikeCommentCheckerTests(unittest.TestCase):
     def test_finds_cpp_go_and_rust_declarations(self):
         cases = {
@@ -42,6 +51,22 @@ class JsonLikeCommentCheckerTests(unittest.TestCase):
                 self.assertEqual(
                     checker.check_source(path, source, CONFIG), []
                 )
+
+    def test_finds_class_and_struct_declarations_in_all_languages(self):
+        cases = {
+            "cpp/engine.hpp": (class_comment() + "\nclass Engine {};", "Engine"),
+            "python/math_sim/engine.py": (
+                "# {\n#   責務: [\n#     Engine: 演算エンジンを表す\n#   ],\n#   フィールド: []\n# }\nclass Engine:\n    pass\n",
+                "Engine",
+            ),
+            "go/engine.go": (class_comment() + "\ntype Engine struct {}", "Engine"),
+            "rust/engine.rs": (class_comment() + "\nstruct Engine {}", "Engine"),
+        }
+        for path, (source, name) in cases.items():
+            with self.subTest(path=path):
+                declarations = checker.find_declarations(path, source)
+                self.assertEqual([item.name for item in declarations], [name])
+                self.assertEqual(checker.check_source(path, source, CONFIG), [])
 
     def test_finds_python_decorator_comment_anchor(self):
         source = '''# {
@@ -70,6 +95,15 @@ def step():
         self.assertTrue(
             any("sequential" in issue.message for issue in checker.check_source("go/engine.go", malformed, CONFIG))
         )
+
+    def test_reports_malformed_block_and_missing_required_key(self):
+        malformed = "// {\n//   責務: [\n// }\nfunc step() {}"
+        self.assertTrue(
+            any("malformed comment block" in issue.message for issue in checker.check_source("go/engine.go", malformed, CONFIG))
+        )
+        missing_key = "// {\n//   責務: [\n//     step: 処理\n//   ]\n// }\nfunc step() {}"
+        messages = [issue.message for issue in checker.check_source("go/engine.go", missing_key, CONFIG)]
+        self.assertIn("missing required key: 処理", messages)
 
     def test_ignores_nonproduction_and_test_paths(self):
         self.assertFalse(checker.is_production_source("tests/fixtures/example.py", CONFIG))
