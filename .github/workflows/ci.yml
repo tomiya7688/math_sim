@@ -35,6 +35,7 @@ jobs:
           python -m unittest discover -s tests -p "test_biology_registry.py"
           python -m unittest discover -s tests -p "test_architecture_check.py"
           python -m unittest discover -s tests -p "test_csharp_oop_gate.py"
+          python -m unittest discover -s tests -p "test_json_like_comments.py"
           python -m unittest discover -s tests -p "test_navigation.py"
           python -m unittest discover -s tests -p "test_application_services.py"
           python -m unittest discover -s tests -p "test_maze_state.py"
@@ -84,4 +85,24 @@ jobs:
             python tools/architecture/check_readmes.py --base "$BASE_SHA"
           else
             python tools/architecture/check_readmes.py
+          fi
+
+  commentout-gate:
+    name: JSON-like Comment Outs gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pull request base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
+      - name: Check changed production declarations
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            python tools/architecture/check_json_like_comments.py --base "$BASE_SHA"
+          else
+            python tools/architecture/check_json_like_comments.py
           fi

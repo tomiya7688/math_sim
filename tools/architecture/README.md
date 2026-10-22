@@ -13,6 +13,7 @@ They inspect source or repository metadata and report violations. They do not re
 - `check_dependencies.py` checks Python package dependency direction and cycles.
 - `check_csharp_oop_gate.py` checks readiness and configuration for the C# design gate.
 - `check_readmes.py` checks README coverage, required sections for newly added modules, and relative links.
+- `check_json_like_comments.py` checks structured comments on newly added production declarations.
 - `.github/readme-requirements.json` is the source of truth for module roots and required headings.
 
 ## Build and test
