@@ -53,3 +53,5 @@
 - [ ] READMEの責務説明とJson-like Comment Outsの宣言が矛盾していない
 - [ ] 新規・変更したproduction宣言に構造化コメントを付け、本文を実装と一致させた（該当時）
 - [ ] [レビュー基準](../docs/review-policy.md)を確認した
+- [ ] 関数・変数名が役割や単位を伝え、不要な変数や説明のない数値literalがない
+- [ ] error / Result / 戻り値を確認し、失敗時の処理とbool条件を確認した
