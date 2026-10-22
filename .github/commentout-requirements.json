@@ -1,0 +1,24 @@
+{
+  "upstream_specification": {
+    "version": "Draft v0.10",
+    "canonical_japanese": "https://github.com/tomiya7688/Json-like-comment-outs/blob/main/docs/jp/SPECIFICATION.md",
+    "templates": "https://github.com/tomiya7688/Json-like-comment-outs/blob/main/docs/jp/TEMPLATE.md"
+  },
+  "comment_prefixes": {
+    ".py": "#",
+    ".c": "//",
+    ".cc": "//",
+    ".cpp": "//",
+    ".cxx": "//",
+    ".h": "//",
+    ".hh": "//",
+    ".hpp": "//",
+    ".hxx": "//",
+    ".go": "//",
+    ".rs": "//"
+  },
+  "production_roots": ["cpp/", "python/math_sim/", "simulations/", "go/", "rust/"],
+  "ignored_path_parts": ["tests", "test", "fixtures", "examples", "build", "dist", "third_party", "vendor"],
+  "class_required_keys": ["責務", "フィールド"],
+  "function_required_keys": ["責務", "処理", "引数", "戻り値"]
+}
