@@ -21,7 +21,7 @@ They inspect source or repository metadata and report violations. They do not re
 
 The Python and source-level checks need no build. Run a checker from the repository root with Python 3, for example `python tools/architecture/check_readmes.py`. The README gate also runs in GitHub Actions.
 
-The dependency checker reads the configured CMake build's File API codemodel for target-link rules. Request `codemodel-v2` before CMake configuration and pass the build directory with `--cmake-build-dir`; CI does this before its CMake configure step.
+The dependency checker reads the configured CMake build's File API codemodel for target-link rules. Request `codemodel-v2` before CMake configuration and pass the build directory with `--cmake-build-dir`; CI does this before its CMake configure step. `--json-report <path>` writes a versioned status and a list of file/line/rule/message records. CI uploads this report as the `architecture-dependency-report` artifact, including when the gate fails.
 
 ## Inputs, outputs, and errors
 

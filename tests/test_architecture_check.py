@@ -276,6 +276,35 @@ class ArchitectureCheckTests(unittest.TestCase):
             finally:
                 architecture_check.ROOT = old_root
 
+    def test_json_report_contains_machine_readable_violation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            old_root = architecture_check.ROOT
+            architecture_check.ROOT = root
+            try:
+                violation = architecture_check.Violation(
+                    root / "cpp/engines/a/CMakeLists.txt",
+                    12,
+                    "ARCH024",
+                    "engine_a -> engine_b: forbidden link",
+                )
+                report_path = root / "build" / "architecture-report.json"
+                architecture_check.write_json_report(report_path, [violation])
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                self.assertEqual(report["status"], "failed")
+                self.assertEqual(report["violation_count"], 1)
+                self.assertEqual(
+                    report["violations"][0],
+                    {
+                        "file": "cpp/engines/a/CMakeLists.txt",
+                        "line": 12,
+                        "rule": "ARCH024",
+                        "message": "engine_a -> engine_b: forbidden link",
+                    },
+                )
+            finally:
+                architecture_check.ROOT = old_root
+
 
 if __name__ == "__main__":
     unittest.main()
