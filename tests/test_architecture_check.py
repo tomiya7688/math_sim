@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -193,6 +194,87 @@ class ArchitectureCheckTests(unittest.TestCase):
             finally:
                 architecture_check.ROOT = old_root
                 architecture_check.PACKAGE_ROOT = old_package
+
+    def _cmake_codemodel(
+        self, root: Path, command: str = "target_link_libraries"
+    ) -> Path:
+        build_dir = root / "build"
+        reply_dir = build_dir / ".cmake" / "api" / "v1" / "reply"
+        reply_dir.mkdir(parents=True)
+        (reply_dir / "index-test.json").write_text(
+            json.dumps({"reply": {"codemodel-v2": {"jsonFile": "codemodel.json"}}}),
+            encoding="utf-8",
+        )
+        (reply_dir / "codemodel.json").write_text(
+            json.dumps(
+                {
+                    "configurations": [
+                        {
+                            "targets": [
+                                {"id": "engine-a", "jsonFile": "target-engine-a.json"},
+                                {"id": "engine-b", "jsonFile": "target-engine-b.json"},
+                            ]
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        (reply_dir / "target-engine-a.json").write_text(
+            json.dumps(
+                {
+                    "id": "engine-a",
+                    "name": "engine_a",
+                    "paths": {"source": "cpp/engines/a"},
+                    "dependencies": [{"id": "engine-b", "backtrace": 0}],
+                    "backtraceGraph": {
+                        "nodes": [{"file": 0, "line": 12, "command": 0}],
+                        "commands": [command],
+                        "files": ["cpp/engines/a/CMakeLists.txt"],
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (reply_dir / "target-engine-b.json").write_text(
+            json.dumps(
+                {
+                    "id": "engine-b",
+                    "name": "engine_b",
+                    "paths": {"source": "cpp/engines/b"},
+                    "dependencies": [],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return build_dir
+
+    def test_cmake_engine_cannot_link_concrete_other_engine(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            old_root = architecture_check.ROOT
+            architecture_check.ROOT = root
+            try:
+                violations = architecture_check.check_cmake_target_link_rules(
+                    self._cmake_codemodel(root)
+                )
+                self.assertEqual([item.rule for item in violations], ["ARCH024"])
+                self.assertEqual(violations[0].line, 12)
+            finally:
+                architecture_check.ROOT = old_root
+
+    def test_cmake_add_dependencies_is_not_reported_as_a_link(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            old_root = architecture_check.ROOT
+            architecture_check.ROOT = root
+            try:
+                violations = architecture_check.check_cmake_target_link_rules(
+                    self._cmake_codemodel(root, command="add_dependencies")
+                )
+                self.assertEqual(violations, [])
+            finally:
+                architecture_check.ROOT = old_root
 
 
 if __name__ == "__main__":

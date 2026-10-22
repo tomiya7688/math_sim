@@ -9,6 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Request CMake dependency codemodel
+        run: |
+          mkdir -p build/.cmake/api/v1/query
+          touch build/.cmake/api/v1/query/codemodel-v2
       - name: Configure C++ engines
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build C++ engines
@@ -22,7 +26,7 @@ jobs:
       - name: Python readability and correctness lint
         run: ruff check python/math_sim --select F821,F841,E712
       - name: Architecture dependency gate
-        run: python tools/architecture/check_dependencies.py
+        run: python tools/architecture/check_dependencies.py --cmake-build-dir build
       - name: C# oop-design-checker readiness gate
         run: python tools/architecture/check_csharp_oop_gate.py
       - name: Run dependency-free Python tests

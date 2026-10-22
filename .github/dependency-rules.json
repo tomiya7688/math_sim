@@ -26,5 +26,13 @@
       "forbidden_include_prefixes": ["math_sim/ui/"],
       "reason": "native engine adapters must not depend on UI code"
     }
+  ],
+  "cmake_target_link_rules": [
+    {
+      "rule": "ARCH024",
+      "source_directory_prefixes": ["cpp/engines/"],
+      "forbidden_dependency_directory_prefixes": ["cpp/engines/"],
+      "reason": "simulation engine targets must not link concrete targets from other simulation engines"
+    }
   ]
 }
