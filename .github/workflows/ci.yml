@@ -26,7 +26,17 @@ jobs:
       - name: Python readability and correctness lint
         run: ruff check python/math_sim --select F821,F841,E712
       - name: Architecture dependency gate
-        run: python tools/architecture/check_dependencies.py --cmake-build-dir build
+        run: >-
+          python tools/architecture/check_dependencies.py
+          --cmake-build-dir build
+          --json-report build/architecture-report.json
+      - name: Upload architecture dependency report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: architecture-dependency-report
+          path: build/architecture-report.json
+          if-no-files-found: warn
       - name: C# oop-design-checker readiness gate
         run: python tools/architecture/check_csharp_oop_gate.py
       - name: Run dependency-free Python tests

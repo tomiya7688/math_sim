@@ -542,6 +542,25 @@ def find_violations() -> list[Violation]:
     return violations
 
 
+def write_json_report(path: Path, violations: list[Violation]) -> None:
+    report = {
+        "schema_version": 1,
+        "status": "failed" if violations else "passed",
+        "violation_count": len(violations),
+        "violations": [
+            {
+                "file": item.path.relative_to(ROOT).as_posix(),
+                "line": item.line,
+                "rule": item.rule,
+                "message": item.message,
+            }
+            for item in violations
+        ],
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -549,16 +568,28 @@ def main() -> int:
         type=Path,
         help="also inspect CMake target_link_libraries relationships from this build tree",
     )
+    parser.add_argument(
+        "--json-report",
+        type=Path,
+        help="write a machine-readable summary of architecture violations",
+    )
     args = parser.parse_args()
     violations = find_violations()
     if args.cmake_build_dir is not None:
         violations.extend(check_cmake_target_link_rules(args.cmake_build_dir))
+    if args.json_report is not None:
+        write_json_report(args.json_report, violations)
     for violation in violations:
         print(violation.github_annotation())
     if violations:
-        print(f"architecture check failed: {len(violations)} violation(s)", file=sys.stderr)
+        report_note = f"; report: {args.json_report}" if args.json_report else ""
+        print(
+            f"architecture check failed: {len(violations)} violation(s){report_note}",
+            file=sys.stderr,
+        )
         return 1
-    print("architecture check passed")
+    report_note = f"; report: {args.json_report}" if args.json_report else ""
+    print(f"architecture check passed (0 violations){report_note}")
     return 0
 
 
