@@ -1,0 +1,49 @@
+{
+  "readme_name": "README.md",
+  "minimum_non_whitespace_characters": 300,
+  "ignored_directory_names": ["build", "dist", "out", "__pycache__", ".venv", "site-packages", "node_modules"],
+  "module_roots": [
+    { "path": "cpp", "depth": 1, "kind": "module" },
+    { "path": "simulations", "depth": 1, "kind": "simulation" },
+    { "path": "cpp/engines", "depth": 1, "kind": "simulation" },
+    { "path": "cpp/include", "depth": 1, "kind": "module" },
+    { "path": "python/math_sim", "depth": 1, "kind": "module" },
+    { "path": "python/math_sim/engines", "depth": 1, "kind": "simulation" },
+    { "path": "python/math_sim/simulations", "depth": 1, "kind": "simulation" },
+    { "path": "python/math_sim/runtime", "depth": 1, "kind": "runtime" },
+    { "path": "python/math_sim/contracts", "depth": 1, "kind": "module" },
+    { "path": "python/math_sim/upd", "depth": 1, "kind": "module" },
+    { "path": "python/math_sim/user_functions", "depth": 1, "kind": "module" },
+    { "path": "python", "depth": 1, "kind": "module" },
+    { "path": "go", "depth": 1, "kind": "module" },
+    { "path": "go/core", "depth": 1, "kind": "module" },
+    { "path": "go/desktop", "depth": 1, "kind": "application" },
+    { "path": "go/desktop/cmd", "depth": 1, "kind": "application" },
+    { "path": "tools", "depth": 1, "kind": "tool" },
+    { "path": "tools/architecture", "depth": 1, "kind": "tool" },
+    { "path": "tools/package", "depth": 1, "kind": "tool" }
+  ],
+  "required_heading_groups": {
+    "common": [
+      ["目的", "purpose"],
+      ["責務と境界", "responsibilities and boundaries"],
+      ["構成", "structure"],
+      ["実行・テスト", "build and test", "execution and testing"],
+      ["入出力とエラー", "inputs, outputs, and errors"]
+    ],
+    "simulation": [
+      ["モデル", "model"],
+      ["パラメータと再現性", "parameters and reproducibility"],
+      ["制約", "limitations"]
+    ]
+  },
+  "public_contract_roots": [
+    "cpp/include/math_sim/",
+    "python/math_sim/contracts/",
+    "python/math_sim/upd/contracts/",
+    "python/math_sim/registry.py",
+    "python/math_sim/catalog.py",
+    "go/core/protocol/",
+    "docs/protocol/"
+  ]
+}

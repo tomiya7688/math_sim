@@ -47,4 +47,8 @@
 - [ ] 変更範囲と必要な証跡を記載した
 - [ ] 実施していない検査を成功扱いしていない
 - [ ] 変更に該当するREADME・契約・ライセンス情報を確認した
+- [ ] 新規module / engine / runtime / demo / toolに対応READMEを含めた（該当時）
+- [ ] READMEの相対リンク先が存在する
+- [ ] 公開interface変更でREADMEを更新しない場合は理由を記載した
+- [ ] READMEの責務説明とJson-like Comment Outsの宣言が矛盾していない
 - [ ] [レビュー基準](../docs/review-policy.md)を確認した
