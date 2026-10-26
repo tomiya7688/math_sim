@@ -108,8 +108,11 @@ def pip_config_items():
 
     configuration = Configuration(isolated=False)
     configuration.load()
-    for item in configuration.items():
-        yield from item[1].items()
+    for key, value in configuration.items():
+        if isinstance(value, dict):
+            yield from value.items()
+        else:
+            yield key, value
 
 
 def verify_bootstrap_trust(
