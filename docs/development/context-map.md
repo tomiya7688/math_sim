@@ -8,6 +8,7 @@
 - PRレビュー受付・承認基準: [レビュー基準](../review-policy.md)、[レビューチェックリスト](../reviewer-checklist.md)、[PRテンプレート](../../.github/PULL_REQUEST_TEMPLATE.md)
 - 宣言コメントのキー・配置・CI範囲: [宣言コメント規約](../commenting.md)
 - Go / Rustのformatter・linter・error handling: [品質ゲート](../language-quality-gates.md)
+- PR前の1コマンド簡易検査: [ローカルチェック手順](local-checks.md)
 - Python依存方向・C++ include・CMake target link境界: [Architecture checker](../../tools/architecture/README.md)、[依存ルール](../../.github/dependency-rules.json)
 - README必須項目とCI検査: [READMEポリシー](../readme-policy.md)、[READMEゲート](../../tools/architecture/README.md)
 
