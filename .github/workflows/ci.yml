@@ -9,6 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Update system CA certificates
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --only-upgrade ca-certificates
       - name: Secure Python packaging tools and CA trust
         run: python tools/package/ensure_python_ca_security.py
       - name: Request CMake dependency codemodel
@@ -71,6 +75,10 @@ jobs:
       PYTHONPATH: python
     steps:
       - uses: actions/checkout@v4
+      - name: Update system CA certificates
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --only-upgrade ca-certificates
       - name: Verify Python packaging tools and CA trust
         run: python tools/package/ensure_python_ca_security.py
       - name: Configure sanitized C++ engines
@@ -90,6 +98,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Update system CA certificates
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --only-upgrade ca-certificates
       - name: Secure Python packaging tools and CA trust
         run: python tools/package/ensure_python_ca_security.py
       - name: Fetch pull request base
@@ -112,6 +124,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Update system CA certificates
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --only-upgrade ca-certificates
       - name: Secure Python packaging tools and CA trust
         run: python tools/package/ensure_python_ca_security.py
       - name: Fetch pull request base
