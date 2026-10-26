@@ -235,20 +235,20 @@ class ArchitectureCheckTests(unittest.TestCase):
             old_package = architecture_check.PACKAGE_ROOT
             old_rules = architecture_check.DEPENDENCY_RULES_PATH
             old_baseline = architecture_check.PARENT_PROCESS_BASELINE
-            architecture_check.ROOT = root
-            architecture_check.PACKAGE_ROOT = package
-            architecture_check.DEPENDENCY_RULES_PATH = (
-                root / ".github" / "dependency-rules.json"
-            )
-            architecture_check.PARENT_PROCESS_BASELINE = (
-                root / "tools" / "architecture" / "parent_process_baseline.json"
-            )
-            architecture_check.DEPENDENCY_RULES_PATH.parent.mkdir(parents=True)
-            architecture_check.DEPENDENCY_RULES_PATH.write_text(
-                json.dumps({"python_import_rules": [], "cpp_include_rules": []}),
-                encoding="utf-8",
-            )
             try:
+                architecture_check.ROOT = root
+                architecture_check.PACKAGE_ROOT = package
+                architecture_check.DEPENDENCY_RULES_PATH = (
+                    root / ".github" / "dependency-rules.json"
+                )
+                architecture_check.PARENT_PROCESS_BASELINE = (
+                    root / "tools" / "architecture" / "parent_process_baseline.json"
+                )
+                architecture_check.DEPENDENCY_RULES_PATH.parent.mkdir(parents=True)
+                architecture_check.DEPENDENCY_RULES_PATH.write_text(
+                    json.dumps({"python_import_rules": [], "cpp_include_rules": []}),
+                    encoding="utf-8",
+                )
                 violations = architecture_check.find_violations()
                 cycle_violations = [
                     item for item in violations if item.rule == "ARCH020"
