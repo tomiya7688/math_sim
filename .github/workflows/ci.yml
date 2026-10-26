@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Secure Python packaging tools and CA trust
+        run: python tools/package/ensure_python_ca_security.py
       - name: Request CMake dependency codemodel
         run: |
           mkdir -p build/.cmake/api/v1/query
@@ -69,6 +71,8 @@ jobs:
       PYTHONPATH: python
     steps:
       - uses: actions/checkout@v4
+      - name: Verify Python packaging tools and CA trust
+        run: python tools/package/ensure_python_ca_security.py
       - name: Configure sanitized C++ engines
         run: >
           cmake -S . -B build
@@ -86,6 +90,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Secure Python packaging tools and CA trust
+        run: python tools/package/ensure_python_ca_security.py
       - name: Fetch pull request base
         if: github.event_name == 'pull_request'
         env:
@@ -106,6 +112,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Secure Python packaging tools and CA trust
+        run: python tools/package/ensure_python_ca_security.py
       - name: Fetch pull request base
         if: github.event_name == 'pull_request'
         env:

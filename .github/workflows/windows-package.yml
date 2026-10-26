@@ -9,6 +9,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Secure Python packaging tools and CA trust
+        run: python tools/package/ensure_python_ca_security.py
 
       - name: Configure native engines
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -56,6 +58,9 @@ jobs:
 
       - name: Validate distribution contents
         run: python tools/package/validate_dist.py dist/math_sim
+
+      - name: Verify packaged CA bundle
+        run: python tools/package/ensure_python_ca_security.py --check-package dist/math_sim
 
       - name: Packaged runtime smoke test
         run: dist/math_sim/math_sim.exe --smoke-test
