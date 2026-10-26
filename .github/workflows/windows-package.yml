@@ -9,6 +9,26 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Remove affected emSign root from runner trust stores
+        shell: pwsh
+        run: |
+          $fingerprint = '86A1ECBA089C4A8D3BBE2734C612BA341D813E043CF9E8A862CD5C57A36BBE6B'
+          $roots = @('Cert:\LocalMachine\Root', 'Cert:\CurrentUser\Root')
+          $removedCount = 0
+          foreach ($root in $roots) {
+            $certificates = Get-ChildItem -LiteralPath $root | Where-Object {
+              [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($_.RawData)) -eq $fingerprint
+            }
+            foreach ($certificate in $certificates) {
+              $path = Join-Path $root $certificate.Thumbprint
+              Remove-Item -LiteralPath $path -Force -ErrorAction Stop
+              if (Test-Path -LiteralPath $path) { throw "Failed to remove affected root: $path" }
+              $removedCount++
+            }
+          }
+          Write-Host "Removed $removedCount affected roots from this ephemeral runner."
+      - name: Secure Python packaging tools and CA trust
+        run: python tools/package/ensure_python_ca_security.py
 
       - name: Configure native engines
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -56,6 +76,9 @@ jobs:
 
       - name: Validate distribution contents
         run: python tools/package/validate_dist.py dist/math_sim
+
+      - name: Verify packaged CA bundle
+        run: python tools/package/ensure_python_ca_security.py --check-package dist/math_sim
 
       - name: Packaged runtime smoke test
         run: dist/math_sim/math_sim.exe --smoke-test
