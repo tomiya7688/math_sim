@@ -233,16 +233,49 @@ class ArchitectureCheckTests(unittest.TestCase):
 
             old_root = architecture_check.ROOT
             old_package = architecture_check.PACKAGE_ROOT
-            architecture_check.ROOT = root
-            architecture_check.PACKAGE_ROOT = package
+            old_rules = architecture_check.DEPENDENCY_RULES_PATH
+            old_baseline = architecture_check.PARENT_PROCESS_BASELINE
             try:
+                architecture_check.ROOT = root
+                architecture_check.PACKAGE_ROOT = package
+                architecture_check.DEPENDENCY_RULES_PATH = (
+                    root / ".github" / "dependency-rules.json"
+                )
+                architecture_check.PARENT_PROCESS_BASELINE = (
+                    root / "tools" / "architecture" / "parent_process_baseline.json"
+                )
+                architecture_check.DEPENDENCY_RULES_PATH.parent.mkdir(parents=True)
+                architecture_check.DEPENDENCY_RULES_PATH.write_text(
+                    json.dumps({"python_import_rules": [], "cpp_include_rules": []}),
+                    encoding="utf-8",
+                )
+                violations = architecture_check.find_violations()
+                cycle_violations = [
+                    item for item in violations if item.rule == "ARCH020"
+                ]
+                self.assertEqual(len(cycle_violations), 1)
                 self.assertEqual(
-                    architecture_check.dependency_cycles(),
-                    [("math_sim.a", "math_sim.b", "math_sim.a")],
+                    cycle_violations[0].cycle_path,
+                    ("math_sim.a", "math_sim.b", "math_sim.a"),
+                )
+                report_path = root / "build" / "architecture-report.json"
+                architecture_check.write_json_report(report_path, cycle_violations)
+                report = json.loads(report_path.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    report["violations"][0],
+                    {
+                        "file": "python/math_sim/a.py",
+                        "line": 1,
+                        "rule": "ARCH020",
+                        "message": "circular dependency: math_sim.a -> math_sim.b -> math_sim.a",
+                        "cycle_path": ["math_sim.a", "math_sim.b", "math_sim.a"],
+                    },
                 )
             finally:
                 architecture_check.ROOT = old_root
                 architecture_check.PACKAGE_ROOT = old_package
+                architecture_check.DEPENDENCY_RULES_PATH = old_rules
+                architecture_check.PARENT_PROCESS_BASELINE = old_baseline
 
     def _cmake_codemodel(
         self, root: Path, command: str = "target_link_libraries"
