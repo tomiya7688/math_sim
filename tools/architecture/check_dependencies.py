@@ -11,7 +11,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_ROOT = ROOT / "python" / "math_sim"
-PARENT_PROCESS_BASELINE = ROOT / "tools" / "architecture" / "parent_process_baseline.json"
+PARENT_PROCESS_BASELINE = (
+    ROOT / "tools" / "architecture" / "parent_process_baseline.json"
+)
 DEPENDENCY_RULES_PATH = ROOT / ".github" / "dependency-rules.json"
 CPP_INCLUDE_PATTERN = re.compile(r'^\s*#\s*include\s*[<"]([^">]+)[">]')
 
@@ -22,6 +24,7 @@ class Violation:
     line: int
     rule: str
     message: str
+    cycle_path: tuple[str, ...] | None = None
 
     def github_annotation(self) -> str:
         relative = self.path.relative_to(ROOT)
@@ -90,10 +93,7 @@ def resolved_import_modules(path: Path) -> list[tuple[int, str]]:
 
 def dependency_cycles() -> list[tuple[str, ...]]:
     paths = sorted(PACKAGE_ROOT.rglob("*.py"))
-    module_to_path = {
-        canonical_module_name(path): path
-        for path in paths
-    }
+    module_to_path = {canonical_module_name(path): path for path in paths}
     known = set(module_to_path)
     graph: dict[str, set[str]] = {module: set() for module in known}
 
@@ -115,10 +115,7 @@ def dependency_cycles() -> list[tuple[str, ...]]:
 
     def normalize(cycle: list[str]) -> tuple[str, ...]:
         ring = cycle[:-1]
-        rotations = [
-            tuple(ring[index:] + ring[:index])
-            for index in range(len(ring))
-        ]
+        rotations = [tuple(ring[index:] + ring[:index]) for index in range(len(ring))]
         best = min(rotations)
         return best + (best[0],)
 
@@ -148,6 +145,7 @@ def load_parent_process_baseline() -> set[tuple[str, str]]:
     if not PARENT_PROCESS_BASELINE.exists():
         return set()
     import json
+
     data = json.loads(PARENT_PROCESS_BASELINE.read_text(encoding="utf-8"))
     return {
         (item["module"], item["import"])
@@ -178,7 +176,9 @@ def check_configured_python_import_rules(
             )
             if exact or prefix:
                 violations.append(
-                    Violation(path, line, rule["rule"], f"{mod}: {rule['reason']}: {imported}")
+                    Violation(
+                        path, line, rule["rule"], f"{mod}: {rule['reason']}: {imported}"
+                    )
                 )
     return violations
 
@@ -195,7 +195,9 @@ def check_cpp_file(path: Path) -> list[Violation]:
             continue
         include = match.group(1).replace("\\", "/")
         for rule in rules:
-            if not any(relative.startswith(prefix) for prefix in rule["source_prefixes"]):
+            if not any(
+                relative.startswith(prefix) for prefix in rule["source_prefixes"]
+            ):
                 continue
             if any(
                 include.startswith(prefix)
@@ -242,7 +244,9 @@ def cmake_link_command(
 def check_cmake_target_link_rules(build_dir: Path) -> list[Violation]:
     """Check direct CMake target links from the configured File API codemodel."""
     reply_dir = build_dir / ".cmake" / "api" / "v1" / "reply"
-    indexes = sorted(reply_dir.glob("index-*.json"), key=lambda path: path.stat().st_mtime)
+    indexes = sorted(
+        reply_dir.glob("index-*.json"), key=lambda path: path.stat().st_mtime
+    )
     if not indexes:
         raise FileNotFoundError(
             "CMake File API reply not found in "
@@ -252,7 +256,9 @@ def check_cmake_target_link_rules(build_dir: Path) -> list[Violation]:
     index = json.loads(indexes[-1].read_text(encoding="utf-8"))
     codemodel_reply = index.get("reply", {}).get("codemodel-v2")
     if not codemodel_reply:
-        raise ValueError(f"CMake File API codemodel-v2 reply missing from {indexes[-1]}")
+        raise ValueError(
+            f"CMake File API codemodel-v2 reply missing from {indexes[-1]}"
+        )
     codemodel_path = reply_dir / codemodel_reply["jsonFile"]
     codemodel = json.loads(codemodel_path.read_text(encoding="utf-8"))
 
@@ -288,7 +294,9 @@ def check_cmake_target_link_rules(build_dir: Path) -> list[Violation]:
                 )
                 dependency_matches = any(
                     dependency_dir.startswith(prefix)
-                    for prefix in rule.get("forbidden_dependency_directory_prefixes", [])
+                    for prefix in rule.get(
+                        "forbidden_dependency_directory_prefixes", []
+                    )
                 )
                 if source_matches and dependency_matches:
                     path, line = target_link_call
@@ -480,7 +488,8 @@ def find_violations() -> list[Violation]:
     if cpp_root.exists():
         cpp_extensions = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}
         cpp_paths = sorted(
-            path for path in cpp_root.rglob("*")
+            path
+            for path in cpp_root.rglob("*")
             if path.is_file() and path.suffix.lower() in cpp_extensions
         )
         for path in cpp_paths:
@@ -495,6 +504,7 @@ def find_violations() -> list[Violation]:
                 1,
                 "ARCH020",
                 "circular dependency: " + " -> ".join(cycle),
+                cycle_path=cycle,
             )
         )
     return violations
@@ -511,6 +521,11 @@ def write_json_report(path: Path, violations: list[Violation]) -> None:
                 "line": item.line,
                 "rule": item.rule,
                 "message": item.message,
+                **(
+                    {"cycle_path": list(item.cycle_path)}
+                    if item.cycle_path is not None
+                    else {}
+                ),
             }
             for item in violations
         ],
