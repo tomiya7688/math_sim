@@ -1,4 +1,10 @@
+import json
+import os
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -7,6 +13,87 @@ from tools import check_local
 
 
 class CheckLocalTests(unittest.TestCase):
+    def test_python_syntax_check_honors_encoding_cookie_and_bom(self):
+        temp_root = os.environ.get("MATH_SIM_LOCAL_TEMP")
+        with tempfile.TemporaryDirectory(dir=temp_root) as directory:
+            latin1 = Path(directory) / "latin1.py"
+            latin1.write_bytes(b"# coding: latin-1\nname = 'caf\xe9'\n")
+            utf8_bom = Path(directory) / "utf8_bom.py"
+            utf8_bom.write_bytes(b"\xef\xbb\xbfname = 'caf\xc3\xa9'\n")
+            result = subprocess.run(
+                [sys.executable, "-c", check_local.PYTHON_SYNTAX_PARSER],
+                input=json.dumps([str(latin1), str(utf8_bom)]),
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_go_module_does_not_hide_unmanaged_changed_source(self):
+        root = Path("E:/fixture/go")
+        check_local.CHECKS.clear()
+        with (
+            redirect_stdout(StringIO()),
+            patch.object(
+                check_local,
+                "module_root",
+                side_effect=lambda path, _manifest: (
+                    root if path.name == "go.mod" else None
+                ),
+            ),
+            patch.object(check_local.shutil, "which") as which,
+        ):
+            check_local.run_go_checks([Path("go/go.mod"), Path("unmanaged.go")])
+        self.assertIn("FAIL", [status for status, _ in check_local.CHECKS])
+        which.assert_not_called()
+
+    def test_rust_module_does_not_hide_unmanaged_changed_source(self):
+        root = Path("E:/fixture/rust")
+        check_local.CHECKS.clear()
+        with (
+            redirect_stdout(StringIO()),
+            patch.object(
+                check_local,
+                "module_root",
+                side_effect=lambda path, _manifest: (
+                    root if path.name == "Cargo.toml" else None
+                ),
+            ),
+            patch.object(check_local, "run_check") as run_check,
+        ):
+            check_local.run_rust_checks([Path("rust/Cargo.toml"), Path("unmanaged.rs")])
+        self.assertIn("FAIL", [status for status, _ in check_local.CHECKS])
+        run_check.assert_not_called()
+
+    def test_rust_clippy_and_tests_include_all_workspace_members(self):
+        root = check_local.ROOT / "rust"
+        checks = []
+        commands = []
+        with (
+            patch.object(check_local, "module_root", return_value=root),
+            patch.object(
+                check_local,
+                "run_check",
+                side_effect=lambda _name, args, **_kwargs: checks.append(args) or True,
+            ),
+            patch.object(
+                check_local,
+                "command",
+                side_effect=lambda args, **_kwargs: (
+                    commands.append(args)
+                    or subprocess.CompletedProcess(
+                        args, 0, "test result: ok. 1 passed; 0 failed; 0 ignored;"
+                    )
+                ),
+            ),
+            patch.object(subprocess, "list2cmdline", return_value="cargo test"),
+            redirect_stdout(StringIO()),
+        ):
+            check_local.run_rust_checks([Path("rust/Cargo.toml")])
+        self.assertIn("--workspace", checks[1])
+        self.assertIn("--workspace", commands[0])
+
     def test_file_checks_split_long_argument_lists(self):
         calls = []
         with (

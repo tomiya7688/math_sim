@@ -15,6 +15,12 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 CHECKS: list[tuple[str, str]] = []
 MAX_COMMAND_LENGTH = 8000
+PYTHON_SYNTAX_PARSER = (
+    "import ast, json, sys, tokenize\n"
+    "for name in json.load(sys.stdin):\n"
+    "    with tokenize.open(name) as source:\n"
+    "        ast.parse(source.read(), filename=name)\n"
+)
 
 
 def command(
@@ -177,6 +183,7 @@ def python_test_environment() -> dict[str, str]:
         env["TEMP"] = str(temporary_directory)
         env["TMP"] = str(temporary_directory)
         env["TMPDIR"] = str(temporary_directory)
+        env["MATH_SIM_LOCAL_TEMP"] = str(temporary_directory)
     return env
 
 
@@ -226,14 +233,9 @@ def run_python_checks(paths: list[Path]) -> None:
         print("SKIP: Python checks (no changed Python files)")
         return
 
-    parser = (
-        "import ast, json, pathlib, sys; "
-        "[(ast.parse(pathlib.Path(name).read_text(encoding='utf-8'), filename=name)) "
-        "for name in json.load(sys.stdin)]"
-    )
     if not run_check(
         "Python syntax (AST, changed files)",
-        [sys.executable, "-c", parser],
+        [sys.executable, "-c", PYTHON_SYNTAX_PARSER],
         input_text=json.dumps(python_files),
     ):
         return
@@ -341,6 +343,17 @@ def run_go_checks(paths: list[Path]) -> None:
         print("SKIP: Go checks (no changed Go files or module manifests)")
         return
     roots = {module_root(path, "go.mod") for path in go_paths}
+    unmanaged = [
+        path
+        for path in go_paths
+        if path.suffix == ".go" and module_root(path, "go.mod") is None
+    ]
+    if unmanaged:
+        CHECKS.append(
+            ("FAIL", f"Go checks: source files are outside go.mod modules: {unmanaged}")
+        )
+        print(f"FAIL: Go checks: source files are outside go.mod modules: {unmanaged}")
+        return
     roots.discard(None)
     if not roots:
         CHECKS.append(
@@ -407,6 +420,20 @@ def run_rust_checks(paths: list[Path]) -> None:
         print("SKIP: Rust checks (no changed Rust files or manifests)")
         return
     roots = {module_root(path, "Cargo.toml") for path in rust_paths}
+    unmanaged = [
+        path
+        for path in rust_paths
+        if path.suffix == ".rs" and module_root(path, "Cargo.toml") is None
+    ]
+    if unmanaged:
+        CHECKS.append(
+            (
+                "FAIL",
+                f"Rust checks: source files are outside Cargo modules: {unmanaged}",
+            )
+        )
+        print(f"FAIL: Rust checks: source files are outside Cargo modules: {unmanaged}")
+        return
     roots.discard(None)
     if not roots:
         CHECKS.append(
@@ -429,6 +456,7 @@ def run_rust_checks(paths: list[Path]) -> None:
                     "clippy",
                     "--manifest-path",
                     manifest,
+                    "--workspace",
                     "--offline",
                     "--all-targets",
                     "--all-features",
@@ -443,7 +471,14 @@ def run_rust_checks(paths: list[Path]) -> None:
             ),
         ):
             run_check(f"{title} ({root.relative_to(ROOT).as_posix()})", args, cwd=root)
-        test_args = ["cargo", "test", "--manifest-path", manifest, "--offline"]
+        test_args = [
+            "cargo",
+            "test",
+            "--manifest-path",
+            manifest,
+            "--workspace",
+            "--offline",
+        ]
         print(f"  command: {subprocess.list2cmdline(test_args)}")
         try:
             test_result = command(test_args, cwd=root)
