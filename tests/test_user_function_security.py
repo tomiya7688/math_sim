@@ -166,6 +166,36 @@ def test_builtin_alias_shadowing_does_not_hide_eval(tmp_path: Path) -> None:
     assert any(item.code == "dynamic_alias_shadow" for item in report.critical)
 
 
+def test_assignment_shadowing_does_not_hide_eval(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def shadow(values, context):\n"
+        "    eval = values\n"
+        "def evaluate(values, context):\n"
+        "    return eval('1 + 1')\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_code" and item.line == 4 for item in report.critical
+    )
+
+
+def test_assignment_shadowing_does_not_hide_getattr(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def shadow(values, context):\n"
+        "    getattr = values\n"
+        "def evaluate(values, context):\n"
+        "    return getattr(values, 'calculate')\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line == 4 for item in report.critical
+    )
+
+
 def test_builtin_eval_import_alias_is_critical(tmp_path: Path) -> None:
     source = tmp_path / "bad.py"
     source.write_text(
@@ -583,6 +613,43 @@ def test_sys_frame_namespaces_are_critical(tmp_path: Path) -> None:
     assert any(
         item.code == "dynamic_attribute" and item.line in {3, 4}
         for item in report.critical
+    )
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "values[:, 0].mean()",
+        "x[1:].sum()",
+        "values[0].conjugate()",
+    ],
+)
+def test_safe_numeric_methods_on_values_subscripts_are_allowed(
+    tmp_path: Path, expression: str
+) -> None:
+    source = tmp_path / "safe.py"
+    assignment = "    x = values\n" if expression.startswith("x[") else ""
+    source.write_text(
+        f"def evaluate(values, context):\n{assignment}    return {expression}\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert not report.critical
+
+
+def test_untrusted_object_method_after_subscript_remains_critical(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def evaluate(values, context):\n"
+        "    functions = context['functions']\n"
+        "    return functions[0].run()\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line == 3 for item in report.critical
     )
 
 

@@ -27,6 +27,8 @@ Default critical findings include:
 - wildcard imports and calls selected through dynamic mapping/subscription access
 - selected dangerous calls hidden by import aliases or object construction, such as `Path(...).unlink()`; calls to unresolved factories or subscription results are blocked when invoked through a local alias
 
+For calls after subscription access, only `mean()`, `sum()`, and `conjugate()` on expressions rooted in the `values` input (or a local alias) are permitted. Other subscription-selected callable or method targets remain critical.
+
 Warnings include:
 
 - imports outside the small numerical/default allowlist

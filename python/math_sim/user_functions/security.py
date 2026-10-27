@@ -119,6 +119,7 @@ _DYNAMIC_ATTRIBUTE_METHODS = {
     "__setattr__",
     "__delattr__",
 }
+_SAFE_NUMERIC_SUBSCRIPT_METHODS = {"mean", "sum", "conjugate"}
 _CRITICAL_ATTR_CALLS = {
     "os.system",
     "os.popen",
@@ -272,6 +273,8 @@ def _bind_security_aliases(tree: ast.AST, aliases: dict[str, set[str]]) -> None:
             if name in sensitive_names
             or name.rsplit(".", 1)[-1] in _DYNAMIC_ATTRIBUTE_METHODS
         }
+        if not candidates:
+            continue
         for target in targets:
             if not isinstance(target, ast.Name):
                 continue
@@ -328,10 +331,80 @@ def _attribute_names(node: ast.AST, aliases: dict[str, set[str]]) -> set[str]:
         else:
             break
     if isinstance(cur, ast.Name):
-        roots = aliases.get(cur.id, {cur.id})
+        roots = set(aliases.get(cur.id, ())) or {cur.id}
+        if cur.id in _PROTECTED_CALL_NAMES:
+            roots.add(cur.id)
         suffix = list(reversed(parts))
         return {".".join([*root.split("."), *suffix]) for root in roots}
     return set()
+
+
+# {
+#   責務: [
+#     _safe_numeric_input_names: values入力とそのローカルな添字別名を追跡する
+#   ],
+#   処理: [
+#     1: 関数引数valuesを安全な数値入力名として登録する,
+#     2: valuesの別名と添字結果のローカル代入を反復して登録する
+#   ],
+#   引数: [tree: 解析対象のAST],
+#   戻り値: [names: 数値入力由来とみなすローカル名の集合]
+# }
+def _safe_numeric_input_names(tree: ast.AST) -> set[str]:
+    names = {
+        argument.arg
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        for argument in node.args.args
+        if argument.arg == "values"
+    }
+    assignments = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+    ]
+    changed = True
+    while changed:
+        changed = False
+        for node in assignments:
+            value = node.value
+            root = _name_root(value)
+            if root not in names:
+                continue
+            if not isinstance(value, ast.Name) and not any(
+                isinstance(child, ast.Subscript) for child in ast.walk(value)
+            ):
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                new_names = _assignment_target_names(target) - names
+                if new_names:
+                    names.update(new_names)
+                    changed = True
+    return names
+
+
+# {
+#   責務: [
+#     _safe_numeric_subscript_method: 数値入力の添字結果に対する許可メソッド呼び出しか判定する
+#   ],
+#   処理: [
+#     1: 呼び出し先が許可メソッド名の属性か確認する,
+#     2: 受け手の添字基底がvalues入力由来か確認する
+#   ],
+#   引数: [node: 呼び出し先ASTノード, numeric_names: 数値入力由来の名前集合],
+#   戻り値: [is_safe: 受け手とメソッドが許可条件を満たす場合はTrue]
+# }
+def _safe_numeric_subscript_method(node: ast.AST, numeric_names: set[str]) -> bool:
+    if (
+        not isinstance(node, ast.Attribute)
+        or node.attr not in _SAFE_NUMERIC_SUBSCRIPT_METHODS
+    ):
+        return False
+    current = node.value
+    while isinstance(current, ast.Attribute):
+        current = current.value
+    return isinstance(current, ast.Subscript) and _name_root(current) in numeric_names
 
 
 # {
@@ -809,6 +882,7 @@ def check_python_file(path: str | Path) -> SecurityReport:
     _bind_security_aliases(tree, aliases)
     dynamic_callable_names = _dynamic_callable_names(tree, aliases)
     unverified_callable_names = _unverified_callable_names(tree)
+    safe_numeric_input_names = _safe_numeric_input_names(tree)
     parents = {
         child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)
     }
@@ -1088,7 +1162,11 @@ def check_python_file(path: str | Path) -> SecurityReport:
                         getattr(node, "lineno", None),
                     )
                 )
-            elif _callee_uses_subscript(node.func):
+            elif _callee_uses_subscript(
+                node.func
+            ) and not _safe_numeric_subscript_method(
+                node.func, safe_numeric_input_names
+            ):
                 findings.append(
                     SecurityFinding(
                         "critical",
