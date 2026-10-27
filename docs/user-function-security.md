@@ -18,19 +18,27 @@ The Python checker parses source with `ast` before the worker process is launche
 
 Default critical findings include:
 
-- process-spawning imports such as `subprocess`
+- process-spawning imports such as `subprocess` and `posix`
 - network/system-sensitive imports such as `socket` and `ctypes`
+- frame namespace introspection such as `sys._getframe`, `f_globals`, and `f_builtins`
 - dynamic code execution through `eval`, `exec`, `compile`, or `__import__`
 - selected shell/process/destructive filesystem calls
+- dynamic attribute names, calls returned or passed onward from `getattr`, frame namespace access, mutation through `setattr`/`delattr`, namespace lookups (`vars`/`globals`/`locals`), and explicit `__getattribute__`-family calls or overrides
+- wildcard imports and calls selected through dynamic mapping/subscription access
+- selected dangerous calls hidden by import aliases or object construction, such as `Path(...).unlink()`; calls to unresolved factories or subscription results are blocked when invoked through a local alias
+
+For calls after subscription access, only `mean()`, `sum()`, and `conjugate()` on expressions rooted in the `values` input (or a local alias) are permitted. Other subscription-selected callable or method targets remain critical.
 
 Warnings include:
 
 - imports outside the small numerical/default allowlist
-- ordinary file access through `open()`
+- ordinary file access through `open()` and `pathlib.Path.open()`
 - filesystem/system APIs requiring review
 - executable module-level statements that run during module loading
 
 This is a heuristic checker, not proof that code is safe.
+Critical findings cannot be overridden with `allow_security_warnings=True`. Safe expression providers remain separate and do not execute arbitrary Python. This checker does not sandbox Python or native code; see the trust and approval boundary tracked separately in Issue #217.
+The alias analysis combines import bindings across the file and may conservatively flag ambiguous or shadowed names. Imports that shadow protected built-in call names are blocked. Windows ACL write permissions are not inspected; the native world-writable bit check applies only on platforms with POSIX permission semantics.
 
 ## Native executable checks
 
