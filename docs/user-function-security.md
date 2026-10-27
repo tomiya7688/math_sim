@@ -18,18 +18,19 @@ The Python checker parses source with `ast` before the worker process is launche
 
 Default critical findings include:
 
-- process-spawning imports such as `subprocess`
+- process-spawning imports such as `subprocess` and `posix`
 - network/system-sensitive imports such as `socket` and `ctypes`
+- frame namespace introspection such as `sys._getframe`, `f_globals`, and `f_builtins`
 - dynamic code execution through `eval`, `exec`, `compile`, or `__import__`
 - selected shell/process/destructive filesystem calls
-- dynamic attribute names, calls returned or passed onward from `getattr`, mutation through `setattr`/`delattr`, namespace lookups (`vars`/`globals`/`locals`), and explicit `__getattribute__`-family calls or overrides
+- dynamic attribute names, calls returned or passed onward from `getattr`, frame namespace access, mutation through `setattr`/`delattr`, namespace lookups (`vars`/`globals`/`locals`), and explicit `__getattribute__`-family calls or overrides
 - wildcard imports and calls selected through dynamic mapping/subscription access
-- selected dangerous calls hidden by import aliases or object construction, such as `Path(...).unlink()`
+- selected dangerous calls hidden by import aliases or object construction, such as `Path(...).unlink()`; calls to unresolved factories or subscription results are blocked when invoked through a local alias
 
 Warnings include:
 
 - imports outside the small numerical/default allowlist
-- ordinary file access through `open()`
+- ordinary file access through `open()` and `pathlib.Path.open()`
 - filesystem/system APIs requiring review
 - executable module-level statements that run during module loading
 

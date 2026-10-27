@@ -62,6 +62,50 @@ def test_path_instance_destructive_method_is_critical(tmp_path: Path) -> None:
     )
 
 
+def test_path_constructor_alias_preserves_destructive_method_identity(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "from pathlib import Path\n"
+        "def evaluate(values, context):\n"
+        "    P = Path\n"
+        "    P('target').replace('other')\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dangerous_call" and item.line == 4 for item in report.critical
+    )
+
+
+def test_path_open_requires_review(tmp_path: Path) -> None:
+    source = tmp_path / "review.py"
+    source.write_text(
+        "from pathlib import Path\n"
+        "def evaluate(values, context):\n"
+        "    return Path('data.txt').open('w')\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "filesystem_or_process_api" and item.line == 3
+        for item in report.warnings
+    )
+
+
+def test_posix_process_module_is_critical(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "import posix\ndef evaluate(values, context):\n    posix.system('command')\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dangerous_import" and item.line == 1 for item in report.critical
+    )
+
+
 def test_os_file_deletion_is_critical(tmp_path: Path) -> None:
     source = tmp_path / "bad.py"
     source.write_text(
@@ -131,6 +175,9 @@ def test_builtin_eval_import_alias_is_critical(tmp_path: Path) -> None:
     )
     report = check_python_file(source)
     assert any(item.code == "dangerous_import" for item in report.critical)
+    assert any(
+        item.code == "dynamic_code" and item.line == 3 for item in report.critical
+    )
 
 
 def test_sensitive_module_alias_assignment_is_critical(tmp_path: Path) -> None:
@@ -173,6 +220,11 @@ def test_vars_mapping_used_as_callable_is_critical(tmp_path: Path) -> None:
         item.code == "dynamic_attribute" and item.severity == "critical"
         for item in report.findings
     )
+    assert any(
+        item.message.startswith("Calling a value selected through subscription")
+        and item.line == 2
+        for item in report.findings
+    )
 
 
 def test_vars_namespace_lookup_is_critical_even_through_a_temporary(
@@ -187,7 +239,13 @@ def test_vars_namespace_lookup_is_critical_even_through_a_temporary(
         encoding="utf-8",
     )
     report = check_python_file(source)
-    assert any(item.code == "dynamic_attribute" for item in report.critical)
+    assert any(
+        item.message.startswith(
+            "Calling a value returned by an unchecked call or subscription"
+        )
+        and item.line == 4
+        for item in report.critical
+    )
 
 
 def test_safe_constant_getattr_and_numeric_methods_are_not_critical(
@@ -250,6 +308,62 @@ def test_getattr_result_returned_through_alias_is_critical(tmp_path: Path) -> No
     )
     report = check_python_file(source)
     assert any(item.code == "dynamic_attribute" for item in report.critical)
+
+
+def test_getattr_result_in_conditional_return_is_critical(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def expose(values, context):\n"
+        "    return getattr(values, 'callback') if context else None\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line == 2 for item in report.critical
+    )
+
+
+def test_getattr_result_in_boolean_alias_return_is_critical(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def expose(values, context):\n"
+        "    callback = getattr(values, 'callback') or None\n"
+        "    return callback\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line == 3 for item in report.critical
+    )
+
+
+def test_getattr_result_assigned_to_global_is_critical(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def expose(values, context):\n"
+        "    global callback\n"
+        "    callback = getattr(values, 'callback')\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line == 3 for item in report.critical
+    )
+
+
+def test_getattr_result_aliased_to_global_is_critical(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def expose(values, context):\n"
+        "    callback = getattr(values, 'callback')\n"
+        "    global published\n"
+        "    published = callback\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line == 4 for item in report.critical
+    )
 
 
 def test_getattr_result_returned_through_attribute_is_critical(tmp_path: Path) -> None:
@@ -422,6 +536,54 @@ def test_subscript_selected_callable_is_critical(tmp_path: Path) -> None:
     )
     report = check_python_file(source)
     assert any(item.code == "dynamic_attribute" for item in report.critical)
+
+
+def test_subscript_selected_callable_alias_called_later_is_critical(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def evaluate(values, context):\n"
+        "    callback = values['callback']\n"
+        "    return callback()\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line == 3 for item in report.critical
+    )
+
+
+def test_factory_callable_alias_called_later_is_critical(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "def evaluate(values, context):\n"
+        "    callback = make_callback()\n"
+        "    return callback()\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line == 3 for item in report.critical
+    )
+
+
+def test_sys_frame_namespaces_are_critical(tmp_path: Path) -> None:
+    source = tmp_path / "bad.py"
+    source.write_text(
+        "import sys\n"
+        "def evaluate(values, context):\n"
+        "    frame = sys._getframe()\n"
+        "    namespace = frame.f_globals\n"
+        "    function = namespace['eval']\n"
+        "    return function('1 + 1')\n",
+        encoding="utf-8",
+    )
+    report = check_python_file(source)
+    assert any(
+        item.code == "dynamic_attribute" and item.line in {3, 4}
+        for item in report.critical
+    )
 
 
 def test_attribute_call_on_subscript_selected_object_is_critical(

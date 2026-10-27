@@ -73,6 +73,7 @@ _CRITICAL_IMPORT_ROOTS = {
     "requests",
     "paramiko",
     "winreg",
+    "posix",
     "builtins",
     "importlib",
 }
@@ -154,6 +155,12 @@ _CRITICAL_ATTR_CALLS = {
     "pathlib.Path.rmdir",
     "pathlib.Path.rename",
     "pathlib.Path.replace",
+    "sys._getframe",
+    "posix.system",
+    "posix.execv",
+    "posix.execve",
+    "posix.spawnv",
+    "posix.spawnve",
 }
 _DANGEROUS_METHOD_NAMES = {"unlink", "rmdir"}
 _DYNAMIC_INTROSPECTION_ATTRIBUTES = {
@@ -164,11 +171,16 @@ _DYNAMIC_INTROSPECTION_ATTRIBUTES = {
     "__class__",
     "__bases__",
     "__mro__",
+    "_getframe",
+    "f_globals",
+    "f_builtins",
+    "f_locals",
 }
 _WARNING_ATTR_PREFIXES = (
     "os.",
     "shutil.",
     "pathlib.Path.write_",
+    "pathlib.Path.open",
     "pathlib.Path.rename",
     "pathlib.Path.replace",
 )
@@ -234,6 +246,7 @@ def _bind_security_aliases(tree: ast.AST, aliases: dict[str, set[str]]) -> None:
         | _CRITICAL_BUILTIN_CALLS
         | _DYNAMIC_NAMESPACE_CALLS
         | _SENSITIVE_MODULE_NAMES
+        | {"pathlib.Path"}
     )
     assignments = [
         node
@@ -359,7 +372,58 @@ def _dynamic_callable_names(tree: ast.AST, aliases: dict[str, set[str]]) -> set[
     for node in assignments:
         value = node.value
         targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-        if _callee_uses_getattr(value, aliases):
+        if any(
+            isinstance(candidate, ast.Call) and _is_getattr_call(candidate, aliases)
+            for candidate in ast.walk(value)
+        ):
+            for target in targets:
+                for name in _assignment_target_names(target):
+                    if name not in names:
+                        names.add(name)
+                        pending.append(name)
+        elif (root := _name_root(value)) is not None:
+            dependents.setdefault(root, []).append(node)
+
+    queued: set[ast.AST] = set()
+    while pending:
+        source_name = pending.popleft()
+        for node in dependents.get(source_name, ()):
+            if node in queued:
+                continue
+            queued.add(node)
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                for name in _assignment_target_names(target):
+                    if name not in names:
+                        names.add(name)
+                        pending.append(name)
+    return names
+
+
+# {
+#   責務: [
+#     _unverified_callable_names: 呼び出しや添字選択の結果を後で呼べる名前として追跡する
+#   ],
+#   処理: [
+#     1: 呼び出し・添字式を代入する名前を集める,
+#     2: 名前・属性・添字による代入別名を作業キューで伝播する
+#   ],
+#   引数: [tree: 解析対象のAST],
+#   戻り値: [names: 呼び出し元が静的に検証できないローカル名の集合]
+# }
+def _unverified_callable_names(tree: ast.AST) -> set[str]:
+    names: set[str] = set()
+    assignments = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+    ]
+    dependents: dict[str, list[ast.AST]] = {}
+    pending: deque[str] = deque()
+    for node in assignments:
+        value = node.value
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        if isinstance(value, ast.Call) or _callee_uses_subscript(value):
             for target in targets:
                 for name in _assignment_target_names(target):
                     if name not in names:
@@ -422,6 +486,11 @@ def _getattr_result_escapes(node: ast.Call, parents: dict[ast.AST, ast.AST]) -> 
     ):
         current = parent
         parent = parents.get(current)
+    while (
+        isinstance(parent, ast.IfExp) and current in (parent.body, parent.orelse)
+    ) or (isinstance(parent, ast.BoolOp) and current in parent.values):
+        current = parent
+        parent = parents.get(current)
     if isinstance(parent, (ast.keyword, ast.Lambda)):
         return True
     if isinstance(parent, (ast.Return, ast.Yield, ast.YieldFrom)):
@@ -431,9 +500,15 @@ def _getattr_result_escapes(node: ast.Call, parents: dict[ast.AST, ast.AST]) -> 
     if isinstance(parent, (ast.Tuple, ast.List, ast.Set, ast.Dict)):
         return True
     if isinstance(parent, ast.Assign):
-        return not all(_is_local_assignment_target(target) for target in parent.targets)
+        return any(
+            not _is_local_assignment_target(target)
+            or _target_writes_outer_scope(target, parents)
+            for target in parent.targets
+        )
     if isinstance(parent, (ast.AnnAssign, ast.NamedExpr)):
-        return not isinstance(parent.target, ast.Name)
+        return not isinstance(parent.target, ast.Name) or _target_writes_outer_scope(
+            parent.target, parents
+        )
     return False
 
 
@@ -458,6 +533,11 @@ def _dynamic_value_escapes(node: ast.Name, parents: dict[ast.AST, ast.AST]) -> b
     ):
         current = parent
         parent = parents.get(current)
+    while (
+        isinstance(parent, ast.IfExp) and current in (parent.body, parent.orelse)
+    ) or (isinstance(parent, ast.BoolOp) and current in parent.values):
+        current = parent
+        parent = parents.get(current)
     if isinstance(parent, (ast.Return, ast.Yield, ast.YieldFrom, ast.keyword)):
         return True
     if isinstance(parent, (ast.Tuple, ast.List, ast.Set, ast.Dict, ast.Lambda)):
@@ -465,9 +545,15 @@ def _dynamic_value_escapes(node: ast.Name, parents: dict[ast.AST, ast.AST]) -> b
     if isinstance(parent, ast.Call):
         return parent.func is not node
     if isinstance(parent, ast.Assign):
-        return not all(_is_local_assignment_target(target) for target in parent.targets)
+        return any(
+            not _is_local_assignment_target(target)
+            or _target_writes_outer_scope(target, parents)
+            for target in parent.targets
+        )
     if isinstance(parent, (ast.AnnAssign, ast.NamedExpr)):
-        return not isinstance(parent.target, ast.Name)
+        return not isinstance(parent.target, ast.Name) or _target_writes_outer_scope(
+            parent.target, parents
+        )
     return False
 
 
@@ -495,6 +581,46 @@ def _is_assignment_target_name(node: ast.Name, parents: dict[ast.AST, ast.AST]) 
         )
     if isinstance(parent, (ast.AnnAssign, ast.NamedExpr)):
         return current is parent.target or current in ast.walk(parent.target)
+    return False
+
+
+# {
+#   責務: [
+#     _target_writes_outer_scope: 代入先の名前がglobalまたはnonlocal宣言か判定する
+#   ],
+#   処理: [
+#     1: 代入先の名前ごとに直近の関数スコープを探す,
+#     2: ネストした宣言を除いてglobal・nonlocal文を確認する
+#   ],
+#   引数: [target: 代入先ASTノード, parents: 親AST対応表],
+#   戻り値: [writes_outer: 外側スコープへ書き込む場合はTrue]
+# }
+def _target_writes_outer_scope(
+    target: ast.AST, parents: dict[ast.AST, ast.AST]
+) -> bool:
+    for name_node in ast.walk(target):
+        if not isinstance(name_node, ast.Name):
+            continue
+        scope = parents.get(name_node)
+        while scope is not None and not isinstance(
+            scope, (ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            scope = parents.get(scope)
+        if scope is None:
+            continue
+        pending = list(scope.body)
+        while pending:
+            statement = pending.pop()
+            if isinstance(
+                statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            ):
+                continue
+            if (
+                isinstance(statement, (ast.Global, ast.Nonlocal))
+                and name_node.id in statement.names
+            ):
+                return True
+            pending.extend(ast.iter_child_nodes(statement))
     return False
 
 
@@ -682,6 +808,7 @@ def check_python_file(path: str | Path) -> SecurityReport:
     aliases = _import_aliases(tree)
     _bind_security_aliases(tree, aliases)
     dynamic_callable_names = _dynamic_callable_names(tree, aliases)
+    unverified_callable_names = _unverified_callable_names(tree)
     parents = {
         child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)
     }
@@ -937,6 +1064,18 @@ def check_python_file(path: str | Path) -> SecurityReport:
                         "critical",
                         "dynamic_attribute",
                         "Calling a value returned by dynamic attribute lookup is prohibited.",
+                        getattr(node, "lineno", None),
+                    )
+                )
+            if (
+                isinstance(node.func, ast.Name)
+                and node.func.id in unverified_callable_names
+            ):
+                findings.append(
+                    SecurityFinding(
+                        "critical",
+                        "dynamic_attribute",
+                        "Calling a value returned by an unchecked call or subscription is prohibited.",
                         getattr(node, "lineno", None),
                     )
                 )
