@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import json
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -12,6 +14,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKS: list[tuple[str, str]] = []
+MAX_COMMAND_LENGTH = 8000
 
 
 def command(
@@ -19,12 +22,20 @@ def command(
     *,
     cwd: Path = ROOT,
     env: dict[str, str] | None = None,
+    input_text: str | None = None,
+    errors: str = "replace",
 ) -> subprocess.CompletedProcess[str]:
+    process_env = (env or os.environ).copy()
+    process_env["PYTHONUTF8"] = "1"
+    process_env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run(
         args,
         cwd=cwd,
-        env=env,
+        env=process_env,
+        input=input_text,
         text=True,
+        encoding="utf-8",
+        errors=errors,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=False,
@@ -32,7 +43,7 @@ def command(
 
 
 def git(*args: str) -> str:
-    result = command(["git", *args])
+    result = command(["git", *args], errors="surrogateescape")
     if result.returncode != 0:
         raise RuntimeError(result.stdout.strip() or f"git {' '.join(args)} failed")
     return result.stdout
@@ -53,16 +64,63 @@ def run_check(
     *,
     cwd: Path = ROOT,
     env: dict[str, str] | None = None,
+    input_text: str | None = None,
 ) -> bool:
-    print(f"  command: {subprocess.list2cmdline(args)}")
+    command_text = (
+        subprocess.list2cmdline(args) if os.name == "nt" else shlex.join(args)
+    )
+    print(f"  command: {command_text}")
     try:
-        return add_result(name, command(args, cwd=cwd, env=env))
+        return add_result(name, command(args, cwd=cwd, env=env, input_text=input_text))
     except FileNotFoundError as error:
         CHECKS.append(
             ("FAIL", f"{name}: required command is unavailable ({error.filename})")
         )
         print(f"FAIL: {name}: required command is unavailable ({error.filename})")
         return False
+
+
+def run_file_checks(
+    name: str,
+    prefix: list[str],
+    files: list[str],
+    *,
+    cwd: Path = ROOT,
+) -> bool:
+    batches: list[list[str]] = []
+    current: list[str] = []
+    for filename in files:
+        candidate = [*current, filename]
+        length = len(subprocess.list2cmdline([*prefix, *candidate]))
+        if current and length > MAX_COMMAND_LENGTH:
+            batches.append(current)
+            current = [filename]
+            length = len(subprocess.list2cmdline([*prefix, filename]))
+        else:
+            current = candidate
+        if length > MAX_COMMAND_LENGTH:
+            CHECKS.append(
+                ("FAIL", f"{name}: one file path exceeds command length limit")
+            )
+            print(
+                f"FAIL: {name}: one file path exceeds command length limit: {filename}"
+            )
+            return False
+    if current:
+        batches.append(current)
+    if not batches:
+        CHECKS.append(("FAIL", f"{name}: no file targets were selected"))
+        print(f"FAIL: {name}: no file targets were selected")
+        return False
+    valid = True
+    for index, batch in enumerate(batches, 1):
+        valid = (
+            run_check(
+                f"{name} (batch {index}/{len(batches)})", [*prefix, *batch], cwd=cwd
+            )
+            and valid
+        )
+    return valid
 
 
 def base_ref() -> str:
@@ -100,16 +158,21 @@ def existing(paths: list[Path]) -> list[str]:
 
 def python_test_environment() -> dict[str, str]:
     env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     if os.name == "nt":
         configured = env.get("MATH_SIM_LOCAL_TEMP")
         if configured:
             temporary_directory = Path(configured)
-        elif Path("E:/program_files/soft/claude/tmp").is_dir():
-            temporary_directory = Path(
-                "E:/program_files/soft/claude/tmp/math-sim-local-check"
-            )
         else:
-            return env
+            scratch_root = (
+                Path(ROOT.anchor) / "program_files" / "soft" / "claude" / "tmp"
+            )
+            temporary_directory = (
+                scratch_root / "math-sim-local-check"
+                if scratch_root.is_dir()
+                else ROOT / "build" / "local-check" / "temp"
+            )
         temporary_directory.mkdir(parents=True, exist_ok=True)
         env["TEMP"] = str(temporary_directory)
         env["TMP"] = str(temporary_directory)
@@ -164,13 +227,14 @@ def run_python_checks(paths: list[Path]) -> None:
         return
 
     parser = (
-        "import ast, pathlib, sys; "
+        "import ast, json, pathlib, sys; "
         "[(ast.parse(pathlib.Path(name).read_text(encoding='utf-8'), filename=name)) "
-        "for name in sys.argv[1:]]"
+        "for name in json.load(sys.stdin)]"
     )
     if not run_check(
         "Python syntax (AST, changed files)",
-        [sys.executable, "-c", parser, *python_files],
+        [sys.executable, "-c", parser],
+        input_text=json.dumps(python_files),
     ):
         return
 
@@ -210,17 +274,19 @@ def run_python_checks(paths: list[Path]) -> None:
                 "Install the pinned dev requirements and rerun this command."
             )
         if add_result("Ruff pinned version", version):
-            run_check(
+            run_file_checks(
                 "Ruff format check (changed Python files)",
-                [ruff, "format", "--check", *python_files],
+                [ruff, "format", "--check"],
+                python_files,
             )
             production = [
                 name for name in python_files if name.startswith("python/math_sim/")
             ]
             if production:
-                run_check(
+                run_file_checks(
                     "Ruff lint (changed Python production files)",
-                    [ruff, "check", *production, "--select", "F821,F841,E712"],
+                    [ruff, "check", "--select", "F821,F841,E712"],
+                    production,
                 )
 
     if any(
@@ -241,18 +307,11 @@ def run_python_checks(paths: list[Path]) -> None:
             additional.add("test_user_function_security.py")
         test_env = python_test_environment()
         test_env["PYTHONPATH"] = str(ROOT / "python")
-        result = subprocess.run(
-            [sys.executable, "tools/run_python_unit_tests.py", *sorted(additional)],
-            cwd=ROOT,
-            env=test_env,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False,
-        )
-        add_result(
+        run_check(
             "Python unit tests (CI shared set plus matching changed tests; no E2E)",
-            result,
+            [sys.executable, "tools/run_python_unit_tests.py", "--extra-tests-stdin"],
+            env=test_env,
+            input_text=json.dumps(sorted(additional)),
         )
     else:
         CHECKS.append(("SKIP", "Python unit tests (no changed package or test files)"))
@@ -479,6 +538,9 @@ def run_csharp_checks(paths: list[Path]) -> None:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
     try:
         base = base_ref()
         paths = changed_files(base)

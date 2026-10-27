@@ -7,6 +7,25 @@ from tools import check_local
 
 
 class CheckLocalTests(unittest.TestCase):
+    def test_file_checks_split_long_argument_lists(self):
+        calls = []
+        with (
+            patch.object(check_local, "MAX_COMMAND_LENGTH", 45),
+            patch.object(
+                check_local,
+                "run_check",
+                side_effect=lambda *args, **kwargs: calls.append(args) or True,
+            ),
+        ):
+            self.assertTrue(
+                check_local.run_file_checks(
+                    "example",
+                    ["checker"],
+                    ["a" * 20, "b" * 20, "c" * 20],
+                )
+            )
+        self.assertEqual(len(calls), 3)
+
     def test_changed_files_combines_branch_and_working_tree_changes(self):
         responses = {
             (

@@ -21,6 +21,6 @@ python tools/check_local.py
 
 Pythonの開発用Ruffは、初回準備時に`python -m pip install -r requirements-dev.txt`で導入します。ローカル簡易検査自体は依存をインストールせず、CIと同じRuffバージョンを確認します。
 
-WindowsではPython単体テスト用Tempを`E:/program_files/soft/claude/tmp/math-sim-local-check`へ置きます。別の書込可能な場所を使う場合は、実行前に`MATH_SIM_LOCAL_TEMP`を設定します。Linux/macOSでは既定のTempを使います。
+Windowsでは作業ツリーのドライブ上にある`program_files/soft/claude/tmp/math-sim-local-check`を優先します。ない場合は作業ツリー内の無視対象`build/local-check/temp`を使います。別の書込可能な場所を使う場合は、実行前に`MATH_SIM_LOCAL_TEMP`を設定します。Linux/macOSでは既定のTempを使います。
 
 この検査は短いローカル確認用です。GUIの実操作、ネイティブエンジンE2E、配布物、複数OS、 sanitizer、CIの全必須ゲートを置き換えません。実行結果と、CIに委ねた項目をPR報告に記録します。基準ブランチのローカルrefがない場合は、先にfetchして再実行します。
