@@ -3,6 +3,7 @@
 ## まず読む
 
 - 作業対象を絞る: [コンテキストマップ](docs/development/context-map.md)
+- PR前のローカル簡易検査: `python tools/check_local.py` ([手順](docs/development/local-checks.md))
 - 実装・レビュー・委譲の進め方: [math-sim-development skill](.agents/skills/math-sim-development/SKILL.md)
 - GUIとシミュレーションの境界: [GUIアーキテクチャ](docs/gui_architecture.md)
 - 宣言コメント規約: [commenting.md](docs/commenting.md)
