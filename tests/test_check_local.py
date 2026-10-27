@@ -46,6 +46,9 @@ class CheckLocalTests(unittest.TestCase):
         ):
             check_local.run_go_checks([Path("go/go.mod"), Path("unmanaged.go")])
         self.assertIn("FAIL", [status for status, _ in check_local.CHECKS])
+        self.assertTrue(
+            any("unmanaged.go" in message for _, message in check_local.CHECKS)
+        )
         which.assert_not_called()
 
     def test_rust_module_does_not_hide_unmanaged_changed_source(self):
@@ -64,6 +67,9 @@ class CheckLocalTests(unittest.TestCase):
         ):
             check_local.run_rust_checks([Path("rust/Cargo.toml"), Path("unmanaged.rs")])
         self.assertIn("FAIL", [status for status, _ in check_local.CHECKS])
+        self.assertTrue(
+            any("unmanaged.rs" in message for _, message in check_local.CHECKS)
+        )
         run_check.assert_not_called()
 
     def test_rust_clippy_and_tests_include_all_workspace_members(self):

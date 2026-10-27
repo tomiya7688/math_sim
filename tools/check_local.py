@@ -342,11 +342,9 @@ def run_go_checks(paths: list[Path]) -> None:
         CHECKS.append(("SKIP", "Go checks (no changed Go files or module manifests)"))
         print("SKIP: Go checks (no changed Go files or module manifests)")
         return
-    roots = {module_root(path, "go.mod") for path in go_paths}
+    resolved = [(path, module_root(path, "go.mod")) for path in go_paths]
     unmanaged = [
-        path
-        for path in go_paths
-        if path.suffix == ".go" and module_root(path, "go.mod") is None
+        path for path, root in resolved if path.suffix == ".go" and root is None
     ]
     if unmanaged:
         CHECKS.append(
@@ -354,7 +352,7 @@ def run_go_checks(paths: list[Path]) -> None:
         )
         print(f"FAIL: Go checks: source files are outside go.mod modules: {unmanaged}")
         return
-    roots.discard(None)
+    roots = {root for _, root in resolved if root is not None}
     if not roots:
         CHECKS.append(
             ("FAIL", "Go checks: changed Go files are outside a go.mod module")
@@ -419,11 +417,9 @@ def run_rust_checks(paths: list[Path]) -> None:
         CHECKS.append(("SKIP", "Rust checks (no changed Rust files or manifests)"))
         print("SKIP: Rust checks (no changed Rust files or manifests)")
         return
-    roots = {module_root(path, "Cargo.toml") for path in rust_paths}
+    resolved = [(path, module_root(path, "Cargo.toml")) for path in rust_paths]
     unmanaged = [
-        path
-        for path in rust_paths
-        if path.suffix == ".rs" and module_root(path, "Cargo.toml") is None
+        path for path, root in resolved if path.suffix == ".rs" and root is None
     ]
     if unmanaged:
         CHECKS.append(
@@ -434,7 +430,7 @@ def run_rust_checks(paths: list[Path]) -> None:
         )
         print(f"FAIL: Rust checks: source files are outside Cargo modules: {unmanaged}")
         return
-    roots.discard(None)
+    roots = {root for _, root in resolved if root is not None}
     if not roots:
         CHECKS.append(
             ("FAIL", "Rust checks: changed Rust files are outside a Cargo module")
