@@ -10,9 +10,21 @@ import unittest
 from unittest.mock import patch
 
 from tools import check_local
+from tools.run_python_unit_tests import TEST_PATTERNS
 
 
 class CheckLocalTests(unittest.TestCase):
+    def setUp(self):
+        previous_checks = check_local.CHECKS.copy()
+        check_local.CHECKS.clear()
+        self.addCleanup(
+            lambda: check_local.CHECKS.__setitem__(slice(None), previous_checks)
+        )
+
+    def test_tool_changes_require_python_unit_tests(self):
+        self.assertTrue(check_local.python_tests_required(["tools/check_local.py"]))
+        self.assertIn("test_check_local.py", TEST_PATTERNS)
+
     def test_python_syntax_check_honors_encoding_cookie_and_bom(self):
         temp_root = os.environ.get("MATH_SIM_LOCAL_TEMP")
         with tempfile.TemporaryDirectory(dir=temp_root) as directory:
@@ -32,7 +44,6 @@ class CheckLocalTests(unittest.TestCase):
 
     def test_go_module_does_not_hide_unmanaged_changed_source(self):
         root = Path("E:/fixture/go")
-        check_local.CHECKS.clear()
         with (
             redirect_stdout(StringIO()),
             patch.object(
@@ -51,9 +62,29 @@ class CheckLocalTests(unittest.TestCase):
         )
         which.assert_not_called()
 
+    def test_missing_go_cli_is_reported_without_exception(self):
+        root = check_local.ROOT / "go" / "core"
+        with (
+            redirect_stdout(StringIO()),
+            patch.object(check_local, "module_root", return_value=root),
+            patch.object(check_local.shutil, "which", return_value="gofmt"),
+            patch.object(check_local, "run_check", return_value=True),
+            patch.object(
+                check_local,
+                "command",
+                side_effect=FileNotFoundError(2, "No such file or directory", "go"),
+            ),
+        ):
+            check_local.run_go_checks([Path("go/core/go.mod")])
+        self.assertTrue(
+            any(
+                status == "FAIL" and "Go test-target discovery" in message
+                for status, message in check_local.CHECKS
+            )
+        )
+
     def test_rust_module_does_not_hide_unmanaged_changed_source(self):
         root = Path("E:/fixture/rust")
-        check_local.CHECKS.clear()
         with (
             redirect_stdout(StringIO()),
             patch.object(
@@ -157,7 +188,7 @@ class CheckLocalTests(unittest.TestCase):
                     check_local.module_root(
                         Path("go/core/registry/catalog.go"), "go.mod"
                     ),
-                    module,
+                    module.resolve(),
                 )
 
     def test_module_root_does_not_escape_repository(self):

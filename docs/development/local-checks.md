@@ -17,10 +17,10 @@ python tools/check_local.py
 - Rust: 対象moduleの`cargo fmt`確認、オフラインClippyとテスト
 - ドキュメントなどコード検査対象外: 適用しない言語検査を`SKIP`と明示
 
-`PASS`/`FAIL`/`SKIP`/`UNVERIFIED`を混同しません。必須コマンドが利用できない、対象テストが0件、検査が失敗した場合は全体を失敗終了します。Go/Rustの検査は依存取得を行わず、Rustはオフラインです。必要なツールやcrateがローカルにない場合は失敗理由を表示し、開発者が準備して再実行します。
+このコマンドは`PASS`/`FAIL`/`SKIP`を出力します。`UNVERIFIED`はコマンドの出力ではなく、コマンドで確認していない項目を理由付きでPR報告に手動記録する区分です。必須コマンドが利用できない、対象テストが0件、検査が失敗した場合は全体を失敗終了します。Go/Rustの検査は依存取得を行わず、Rustはオフラインです。必要なツールやcrateがローカルにない場合は失敗理由を表示し、開発者が準備して再実行します。
 
 Pythonの開発用Ruffは、初回準備時に`python -m pip install -r requirements-dev.txt`で導入します。ローカル簡易検査自体は依存をインストールせず、CIと同じRuffバージョンを確認します。
 
-Windowsでは作業ツリーのドライブ上にある`program_files/soft/claude/tmp/math-sim-local-check`を優先します。ない場合は作業ツリー内の無視対象`build/local-check/temp`を使います。別の書込可能な場所を使う場合は、実行前に`MATH_SIM_LOCAL_TEMP`を設定します。Linux/macOSでは既定のTempを使います。
+Windowsでは作業ツリー内の無視対象`build/local-check/temp`を使います。別の書込可能な場所を使う場合は、実行前に`MATH_SIM_LOCAL_TEMP`を設定します。Linux/macOSでは既定のTempを使います。
 
 この検査は短いローカル確認用です。GUIの実操作、ネイティブエンジンE2E、配布物、複数OS、 sanitizer、CIの全必須ゲートを置き換えません。実行結果と、CIに委ねた項目をPR報告に記録します。基準ブランチのローカルrefがない場合は、先にfetchして再実行します。

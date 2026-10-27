@@ -171,14 +171,7 @@ def python_test_environment() -> dict[str, str]:
         if configured:
             temporary_directory = Path(configured)
         else:
-            scratch_root = (
-                Path(ROOT.anchor) / "program_files" / "soft" / "claude" / "tmp"
-            )
-            temporary_directory = (
-                scratch_root / "math-sim-local-check"
-                if scratch_root.is_dir()
-                else ROOT / "build" / "local-check" / "temp"
-            )
+            temporary_directory = ROOT / "build" / "local-check" / "temp"
         temporary_directory.mkdir(parents=True, exist_ok=True)
         env["TEMP"] = str(temporary_directory)
         env["TMP"] = str(temporary_directory)
@@ -291,9 +284,7 @@ def run_python_checks(paths: list[Path]) -> None:
                     production,
                 )
 
-    if any(
-        name.startswith(("python/math_sim/", "tests/test_")) for name in python_files
-    ):
+    if python_tests_required(python_files):
         additional = {
             Path(name).name for name in python_files if name.startswith("tests/test_")
         }
@@ -318,6 +309,13 @@ def run_python_checks(paths: list[Path]) -> None:
     else:
         CHECKS.append(("SKIP", "Python unit tests (no changed package or test files)"))
         print("SKIP: Python unit tests (no changed package or test files)")
+
+
+def python_tests_required(python_files: list[str]) -> bool:
+    return any(
+        name.startswith(("python/math_sim/", "tests/test_", "tools/"))
+        for name in python_files
+    )
 
 
 def module_root(path: Path, manifest: str) -> Path | None:
@@ -382,17 +380,22 @@ def run_go_checks(paths: list[Path]) -> None:
         run_check(
             "Go vet (" + module + ")", ["go", "vet", "./..."], cwd=root, env=go_env
         )
-        targets = command(
-            [
-                "go",
-                "list",
-                "-f",
-                "{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}",
-                "./...",
-            ],
-            cwd=root,
-            env=go_env,
-        )
+        list_args = [
+            "go",
+            "list",
+            "-f",
+            "{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}",
+            "./...",
+        ]
+        try:
+            targets = command(list_args, cwd=root, env=go_env)
+        except FileNotFoundError as error:
+            targets = subprocess.CompletedProcess(
+                list_args,
+                1,
+                f"required command is unavailable ({error.filename or list_args[0]})",
+                "",
+            )
         if targets.returncode != 0:
             add_result("Go test-target discovery (" + module + ")", targets)
         elif not targets.stdout.strip():
