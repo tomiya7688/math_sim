@@ -174,9 +174,31 @@ _WARNING_ATTR_PREFIXES = (
 )
 
 
+# {
+#   責務: [
+#     _import_aliases: import文の別名と参照先の対応を作る
+#   ],
+#   処理: [
+#     1: AST内のimport宣言を走査する,
+#     2: 各ローカル名に参照先候補を記録する
+#   ],
+#   引数: [tree: 解析対象のAST],
+#   戻り値: [aliases: ローカル名ごとの参照先候補]
+# }
 def _import_aliases(tree: ast.AST) -> dict[str, set[str]]:
     aliases: dict[str, set[str]] = {}
 
+    # {
+    #   責務: [
+    #     bind: ローカル名に参照先候補を登録する
+    #   ],
+    #   処理: [
+    #     1: 既存候補の集合を取得する,
+    #     2: 新しい参照先を集合へ追加する
+    #   ],
+    #   引数: [local: ローカル名, target: 参照先の完全名],
+    #   戻り値: []
+    # }
     def bind(local: str, target: str) -> None:
         aliases.setdefault(local, set()).add(target)
 
@@ -194,6 +216,17 @@ def _import_aliases(tree: ast.AST) -> dict[str, set[str]]:
     return aliases
 
 
+# {
+#   責務: [
+#     _bind_security_aliases: 代入で伝播した禁止APIや機微モジュールの別名を記録する
+#   ],
+#   処理: [
+#     1: 単純な名前・属性代入の依存関係を集める,
+#     2: 既知の危険名を依存先へ作業キューで伝播する
+#   ],
+#   引数: [tree: 解析対象のAST, aliases: import別名対応表],
+#   戻り値: []
+# }
 def _bind_security_aliases(tree: ast.AST, aliases: dict[str, set[str]]) -> None:
     sensitive_names = (
         _CRITICAL_ATTR_CALLS
@@ -240,6 +273,17 @@ def _bind_security_aliases(tree: ast.AST, aliases: dict[str, set[str]]) -> None:
                     queued.add(dependent)
 
 
+# {
+#   責務: [
+#     _name_root: 属性列や添字式の基底にある名前を取り出す
+#   ],
+#   処理: [
+#     1: 属性と添字の値側をたどる,
+#     2: 最初の名前ノードを返す
+#   ],
+#   引数: [node: 基底名を調べるASTノード],
+#   戻り値: [name: 基底名、または名前がない場合はNone]
+# }
 def _name_root(node: ast.AST) -> str | None:
     current = node
     while isinstance(current, (ast.Attribute, ast.Subscript)):
@@ -247,6 +291,17 @@ def _name_root(node: ast.AST) -> str | None:
     return current.id if isinstance(current, ast.Name) else None
 
 
+# {
+#   責務: [
+#     _attribute_names: 静的に解決できる名前・属性列を正規名候補へ変換する
+#   ],
+#   処理: [
+#     1: 属性列と呼び出し元のASTを分解する,
+#     2: import別名を展開して候補集合を作る
+#   ],
+#   引数: [node: 名前を解決するASTノード, aliases: import別名対応表],
+#   戻り値: [names: 正規化された名前候補]
+# }
 def _attribute_names(node: ast.AST, aliases: dict[str, set[str]]) -> set[str]:
     parts: list[str] = []
     cur = node
@@ -266,10 +321,32 @@ def _attribute_names(node: ast.AST, aliases: dict[str, set[str]]) -> set[str]:
     return set()
 
 
+# {
+#   責務: [
+#     _is_getattr_call: 呼び出し先がgetattrまたはその組み込み別名か判定する
+#   ],
+#   処理: [
+#     1: 呼び出し先の名前候補を解決する,
+#     2: getattrの候補との一致を確認する
+#   ],
+#   引数: [node: 呼び出しAST, aliases: import別名対応表],
+#   戻り値: [matched: 対象呼び出しならTrue]
+# }
 def _is_getattr_call(node: ast.Call, aliases: dict[str, set[str]]) -> bool:
     return bool(_attribute_names(node.func, aliases) & {"getattr", "builtins.getattr"})
 
 
+# {
+#   責務: [
+#     _dynamic_callable_names: 動的属性取得の値を受け取ったローカル名を追跡する
+#   ],
+#   処理: [
+#     1: getter呼び出しと名前・属性・添字の代入を集める,
+#     2: 代入依存を作業キューで伝播する
+#   ],
+#   引数: [tree: 解析対象のAST, aliases: import別名対応表],
+#   戻り値: [names: 動的属性値を保持するローカル名の集合]
+# }
 def _dynamic_callable_names(tree: ast.AST, aliases: dict[str, set[str]]) -> set[str]:
     names: set[str] = set()
     assignments = [
@@ -307,6 +384,17 @@ def _dynamic_callable_names(tree: ast.AST, aliases: dict[str, set[str]]) -> set[
     return names
 
 
+# {
+#   責務: [
+#     _assignment_target_names: 名前とタプル・リスト代入先から名前を集める
+#   ],
+#   処理: [
+#     1: 名前ノードならその識別子を返す,
+#     2: タプル・リストなら要素ごとに再帰して結合する
+#   ],
+#   引数: [node: 代入先のASTノード],
+#   戻り値: [names: 代入先の識別子集合]
+# }
 def _assignment_target_names(node: ast.AST) -> set[str]:
     if isinstance(node, ast.Name):
         return {node.id}
@@ -315,6 +403,17 @@ def _assignment_target_names(node: ast.AST) -> set[str]:
     return set()
 
 
+# {
+#   責務: [
+#     _getattr_result_escapes: getterの直接結果が呼び出し元や別の値へ漏れるか判定する
+#   ],
+#   処理: [
+#     1: 属性・添字の値側を親ASTへたどる,
+#     2: 返却・yield・引数・非ローカル代入などの逃避先を検出する
+#   ],
+#   引数: [node: getter呼び出しAST, parents: 親AST対応表],
+#   戻り値: [escapes: ローカル値読み取りを越えて伝播する場合はTrue]
+# }
 def _getattr_result_escapes(node: ast.Call, parents: dict[ast.AST, ast.AST]) -> bool:
     current: ast.AST = node
     parent = parents.get(current)
@@ -338,6 +437,17 @@ def _getattr_result_escapes(node: ast.Call, parents: dict[ast.AST, ast.AST]) -> 
     return False
 
 
+# {
+#   責務: [
+#     _dynamic_value_escapes: 動的値を保持する名前の利用先がローカル範囲を越えるか判定する
+#   ],
+#   処理: [
+#     1: 代入先自身と属性列を区別する,
+#     2: 返却・引数・コンテナ格納などの逃避先を検出する
+#   ],
+#   引数: [node: 動的値を保持する名前AST, parents: 親AST対応表],
+#   戻り値: [escapes: ローカル範囲を越える場合はTrue]
+# }
 def _dynamic_value_escapes(node: ast.Name, parents: dict[ast.AST, ast.AST]) -> bool:
     if _is_assignment_target_name(node, parents):
         return False
@@ -361,6 +471,17 @@ def _dynamic_value_escapes(node: ast.Name, parents: dict[ast.AST, ast.AST]) -> b
     return False
 
 
+# {
+#   責務: [
+#     _is_assignment_target_name: 名前ノードが代入先の一部か判定する
+#   ],
+#   処理: [
+#     1: タプル・リスト代入先の親をたどる,
+#     2: 代入文のtargetとの包含関係を調べる
+#   ],
+#   引数: [node: 名前AST, parents: 親AST対応表],
+#   戻り値: [is_target: 代入先に含まれる場合はTrue]
+# }
 def _is_assignment_target_name(node: ast.Name, parents: dict[ast.AST, ast.AST]) -> bool:
     current: ast.AST = node
     parent = parents.get(current)
@@ -377,6 +498,17 @@ def _is_assignment_target_name(node: ast.Name, parents: dict[ast.AST, ast.AST]) 
     return False
 
 
+# {
+#   責務: [
+#     _is_local_assignment_target: 代入先がローカル名だけで構成されるか判定する
+#   ],
+#   処理: [
+#     1: 名前ノードをローカル先として許可する,
+#     2: タプル・リスト内の各要素を再帰的に判定する
+#   ],
+#   引数: [node: 代入先のASTノード],
+#   戻り値: [is_local: 属性・添字書き込みを含まない場合はTrue]
+# }
 def _is_local_assignment_target(node: ast.AST) -> bool:
     if isinstance(node, ast.Name):
         return True
@@ -385,6 +517,17 @@ def _is_local_assignment_target(node: ast.AST) -> bool:
     return False
 
 
+# {
+#   責務: [
+#     _callee_uses_subscript: 呼び出し先が添字選択値に依存するか判定する
+#   ],
+#   処理: [
+#     1: 属性・呼び出し元ノードをたどる,
+#     2: 添字ノードが含まれるか調べる
+#   ],
+#   引数: [node: 呼び出し先のASTノード],
+#   戻り値: [uses_subscript: 添字由来ならTrue]
+# }
 def _callee_uses_subscript(node: ast.AST) -> bool:
     current = node
     while True:
@@ -398,6 +541,17 @@ def _callee_uses_subscript(node: ast.AST) -> bool:
             return False
 
 
+# {
+#   責務: [
+#     _callee_uses_getattr: 呼び出し先がgetattrの結果に依存するか判定する
+#   ],
+#   処理: [
+#     1: 呼び出しと属性の関数側をたどる,
+#     2: getattr呼び出しの有無を確認する
+#   ],
+#   引数: [node: 呼び出し先のASTノード, aliases: import別名対応表],
+#   戻り値: [uses_getattr: getter由来ならTrue]
+# }
 def _callee_uses_getattr(node: ast.AST, aliases: dict[str, set[str]]) -> bool:
     current = node
     while True:
@@ -411,11 +565,33 @@ def _callee_uses_getattr(node: ast.AST, aliases: dict[str, set[str]]) -> bool:
             return False
 
 
+# {
+#   責務: [
+#     _is_dynamic_namespace_call: 呼び出し先が動的名前空間APIか判定する
+#   ],
+#   処理: [
+#     1: 呼び出し先の正規名候補を解決する,
+#     2: 禁止する名前空間API集合と照合する
+#   ],
+#   引数: [node: 呼び出しAST, aliases: import別名対応表],
+#   戻り値: [is_dynamic: 動的名前空間APIならTrue]
+# }
 def _is_dynamic_namespace_call(node: ast.Call, aliases: dict[str, set[str]]) -> bool:
     names = _attribute_names(node.func, aliases)
     return bool(names & _DYNAMIC_NAMESPACE_CALLS)
 
 
+# {
+#   責務: [
+#     _is_dangerous_name: 正規名が禁止する実行・破壊的APIか判定する
+#   ],
+#   処理: [
+#     1: 既知の禁止API集合との一致を確認する,
+#     2: 実行・spawn系と破壊的末端名の接頭辞・末尾を照合する
+#   ],
+#   引数: [name: 正規化されたAPI名候補],
+#   戻り値: [is_dangerous: 禁止対象ならTrue]
+# }
 def _is_dangerous_name(name: str) -> bool:
     return (
         name in _CRITICAL_ATTR_CALLS
@@ -426,6 +602,17 @@ def _is_dangerous_name(name: str) -> bool:
     )
 
 
+# {
+#   責務: [
+#     _sha256: ファイル内容のSHA-256を計算する
+#   ],
+#   処理: [
+#     1: ファイルをバイナリで開く,
+#     2: チャンクごとにハッシュへ追加する
+#   ],
+#   引数: [path: ハッシュ対象ファイルのパス],
+#   戻り値: [digest: 小文字16進SHA-256文字列]
+# }
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as handle:
@@ -434,6 +621,18 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+# {
+#   責務: [
+#     check_python_file: Pythonユーザー関数を静的に解析しセキュリティ所見を返す
+#   ],
+#   処理: [
+#     1: ファイル形式とUTF-8ソースを確認する,
+#     2: ASTからimport・動的属性・危険呼び出しを検査する,
+#     3: ファイルのSHA-256と所見をまとめる
+#   ],
+#   引数: [path: Python関数ソースのファイルパス],
+#   戻り値: [report: 検出された警告・critical所見を含む検査結果]
+# }
 def check_python_file(path: str | Path) -> SecurityReport:
     source_path = Path(path).resolve()
     findings: list[SecurityFinding] = []
@@ -843,6 +1042,17 @@ def check_python_file(path: str | Path) -> SecurityReport:
     )
 
 
+# {
+#   責務: [
+#     check_native_file: ネイティブ関数実行ファイルの存在・権限・ハッシュを検査する
+#   ],
+#   処理: [
+#     1: 拡張子・実行可能性・書き込み権限を確認する,
+#     2: 信頼済みハッシュとの一致と配置場所を確認する
+#   ],
+#   引数: [path: ネイティブ実行ファイルのパス, expected_sha256: 設定された期待ハッシュ],
+#   戻り値: [report: 検出された警告・critical所見を含む検査結果]
+# }
 def check_native_file(
     path: str | Path, expected_sha256: str | None = None
 ) -> SecurityReport:
