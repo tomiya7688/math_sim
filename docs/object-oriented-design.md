@@ -32,3 +32,13 @@ currently contains Python and C++ application code. Therefore it is not run agai
 cannot analyze. The repository keeps `oop-design-checker.json` as the future C# gate
 configuration. If a C# project is added, CI should invoke a pinned checker release against
 that project; project-owned code should not be broadly suppressed.
+
+## Concrete-base inheritance and review policy
+
+- **Prohibit `concrete A → B → C`.** When B inherits from concrete A, C must not inherit from B, whether B is abstract or concrete.
+- **`abstract A → concrete B → C` does not violate this prohibition**, but still requires review for readability, meaningful responsibility boundaries, and substitutability. A further step `concrete B → C → D` is prohibited.
+- `concrete A → B` is not prohibited by this policy alone. Preserve stricter existing project rules. Exclude implicit root types such as `Object` and interface inheritance/implementation from this check.
+- **Avoid inheriting behavior-bearing classes, including abstract classes with implemented methods, unless inheritance itself is meaningful.** Prefer delegation/composition for simple reuse.
+- Use inheritance only for a genuine shared shape/contract already present or reasonably expected to be needed. Reject speculative, purposeless abstraction and any inheritance hierarchy that is hard to read or maintain, even if it passes the mechanical prohibition.
+- Exceptions require explicit project architecture documentation of the intentional hierarchy, rationale, and scope. Compiler/analyzer input examples and teaching fixtures are separate from production implementation policy.
+- Apply to new/modified project-owned implementation, without mass-changing unrelated legacy code.
